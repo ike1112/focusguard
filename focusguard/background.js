@@ -7,10 +7,31 @@
  *   - Message receiving from content scripts
  *   - Tab management (future: close blocked tabs)
  *
- * Phase 1: Skeleton only. AI classification added in Phase 2.
+ * Phase 2: Wires classifier.js into PAGE_DATA handler.
  */
 
 'use strict';
+
+// --- Module loading ---
+
+try {
+  importScripts('classifier.js');
+} catch (e) {
+  console.error('[FocusGuard] Failed to load classifier.js:', e);
+}
+
+// Fail-open shim: if classifier never loaded, PAGE_DATA must still
+// receive a valid verdict so the child can keep browsing.
+if (!self.FocusGuardClassifier || typeof self.FocusGuardClassifier.classifyPage !== 'function') {
+  self.FocusGuardClassifier = {
+    classifyPage: async () => ({
+      verdict: 'allow',
+      reason: 'classifier-load-error',
+      confidence: 1,
+      source: 'fallback',
+    }),
+  };
+}
 
 // --- Installation handler ---
 
@@ -24,33 +45,25 @@ chrome.runtime.onInstalled.addListener((details) => {
 // --- Message handler (content script -> background) ---
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === 'PAGE_DATA') {
-    // Phase 1: just log it to prove message passing works
-    console.log('[FocusGuard] Page data received:', {
+  if (message && message.type === 'PAGE_DATA' && typeof message.url === 'string') {
+    self.FocusGuardClassifier.classifyPage({
       url: message.url,
-      title: message.title,
-      tabId: sender.tab?.id,
+      title: typeof message.title === 'string' ? message.title : '',
+    }).then((verdict) => {
+      console.log('[FocusGuard] classify', message.url, '->',
+        verdict.verdict, `(${verdict.reason}, ${verdict.confidence.toFixed(2)}, ${verdict.source})`);
+      sendResponse(verdict);
+    }).catch((e) => {
+      // Defensive: classifier promises to never reject, but just in case
+      console.error('[FocusGuard] unexpected classifier error:', e);
+      sendResponse({ verdict: 'allow', reason: 'internal-error', confidence: 1, source: 'fallback' });
     });
 
-    // Always respond with 'allow' for now (Phase 2 adds AI classification)
-    sendResponse({ verdict: 'allow' });
+    // Keep the message channel open for the async response
+    return true;
   }
 
-  // Return true to indicate async response (needed even if sync for now)
-  return true;
+  // Unknown message type — no async response
+  return false;
 });
 
-// --- Tab event listeners (skeleton for future use) ---
-
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  // Phase 2 will use this to trigger classification on navigation
-  if (changeInfo.status === 'complete' && tab.url) {
-    // Skip internal pages
-    if (tab.url.startsWith('chrome://') ||
-        tab.url.startsWith('chrome-extension://') ||
-        tab.url.startsWith('about:')) {
-      return;
-    }
-    // Future: trigger classification here
-  }
-});
