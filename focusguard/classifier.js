@@ -18,7 +18,9 @@
 const MODEL = 'claude-haiku-4-5';
 const API_URL = 'https://api.anthropic.com/v1/messages';
 const API_VERSION = '2023-06-01';
-const REQUEST_TIMEOUT_MS = 5000;
+// Generous enough to absorb cold-start DNS/TLS setup on the first request
+// after a service-worker wake. Haiku typically responds in <1s when warm.
+const REQUEST_TIMEOUT_MS = 15000;
 const MAX_TOKENS = 150;
 const CACHE_MAX_ENTRIES = 500;
 

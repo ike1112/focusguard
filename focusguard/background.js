@@ -67,3 +67,38 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return false;
 });
 
+// --- SPA navigation detection ---
+//
+// content.js only runs once per full page load. SPAs (YouTube, Reddit,
+// Twitter, etc.) use history.pushState() to change the URL without
+// reloading, so content.js never re-fires. Watch chrome.tabs.onUpdated
+// for URL-only changes (URL set, no status transition) to classify
+// SPA navigations too.
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  // Fire whenever the tab's URL changes. This catches SPA navigations
+  // (YouTube search, Reddit subreddit clicks, etc.) that content.js misses
+  // because it only runs once at document_idle. Full-load URL commits also
+  // hit this listener — the classifier's cache dedupes them against any
+  // PAGE_DATA classification that content.js triggers later.
+  if (!changeInfo.url) return;
+
+  const url = changeInfo.url;
+  if (url.startsWith('chrome://') ||
+      url.startsWith('chrome-extension://') ||
+      url.startsWith('about:') ||
+      url.startsWith('file://')) {
+    return;
+  }
+
+  self.FocusGuardClassifier.classifyPage({
+    url,
+    title: tab.title || '',
+  }).then((verdict) => {
+    console.log('[FocusGuard] spa-classify', url, '->',
+      verdict.verdict, `(${verdict.reason}, ${verdict.confidence.toFixed(2)}, ${verdict.source})`);
+  }).catch((e) => {
+    console.error('[FocusGuard] unexpected classifier error (spa):', e);
+  });
+});
+
