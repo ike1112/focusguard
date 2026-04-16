@@ -3,7 +3,7 @@
   "name": "FocusGuard",
   "version": "0.1.0",
   "description": "AI-powered homework focus assistant. Keeps students on task by classifying web content.",
-  "permissions": ["tabs", "storage"],
+  "permissions": ["tabs", "storage", "alarms"],
   "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "background.js"

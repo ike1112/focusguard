@@ -1,13 +1,9 @@
 /**
  * background.js — FocusGuard Service Worker
  *
- * Chrome's background service worker for FocusGuard.
- * Handles:
- *   - First-time install: opens setup page
- *   - Message receiving from content scripts
- *   - Tab management (future: close blocked tabs)
- *
- * Phase 2: Wires classifier.js into PAGE_DATA handler.
+ * Loads classifier + logger modules, dispatches content-script messages,
+ * classifies SPA navigations, tracks active-tab duration, and runs the
+ * daily log-prune alarm.
  */
 
 'use strict';
@@ -15,9 +11,9 @@
 // --- Module loading ---
 
 try {
-  importScripts('classifier.js');
+  importScripts('classifier.js', 'logger.js');
 } catch (e) {
-  console.error('[FocusGuard] Failed to load classifier.js:', e);
+  console.error('[FocusGuard] importScripts failed:', e);
 }
 
 // Fail-open shim: if classifier never loaded, PAGE_DATA must still
@@ -33,6 +29,32 @@ if (!self.FocusGuardClassifier || typeof self.FocusGuardClassifier.classifyPage 
   };
 }
 
+// Logger fail-open shim: if logger never loaded, every call site becomes a
+// no-op so classification + overlay flow keeps working.
+if (!self.FocusGuardLogger) self.FocusGuardLogger = {};
+const NOOP = () => {};
+const NOOP_ASYNC = async () => {};
+self.FocusGuardLogger.logPageVisit = self.FocusGuardLogger.logPageVisit || NOOP_ASYNC;
+self.FocusGuardLogger.markTabActive = self.FocusGuardLogger.markTabActive || NOOP;
+self.FocusGuardLogger.markTabInactive = self.FocusGuardLogger.markTabInactive || NOOP;
+self.FocusGuardLogger.forgetTab = self.FocusGuardLogger.forgetTab || NOOP;
+self.FocusGuardLogger.pruneOldLogs = self.FocusGuardLogger.pruneOldLogs || NOOP_ASYNC;
+
+// --- Shared helper: persist a classification verdict ---
+// Both the PAGE_DATA handler and the SPA onUpdated handler log the same
+// entry shape after classify; this helper keeps them in sync.
+function logClassification({ url, title, tabId, verdict }) {
+  self.FocusGuardLogger.logPageVisit({
+    url,
+    title,
+    verdict: verdict.verdict,
+    reason: verdict.reason,
+    confidence: verdict.confidence,
+    source: verdict.source,
+    tabId,
+  }).catch(() => {});
+}
+
 // --- Installation handler ---
 
 chrome.runtime.onInstalled.addListener((details) => {
@@ -40,19 +62,38 @@ chrome.runtime.onInstalled.addListener((details) => {
     // Open setup page on first install
     chrome.tabs.create({ url: chrome.runtime.getURL('setup.html') });
   }
+  // Daily prune alarm — first fire 1 min after install, then every 24h.
+  chrome.alarms.create('focusguard-prune', {
+    when: Date.now() + 60 * 1000,
+    periodInMinutes: 24 * 60,
+  });
+  self.FocusGuardLogger.pruneOldLogs();
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  self.FocusGuardLogger.pruneOldLogs();
+});
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === 'focusguard-prune') {
+    self.FocusGuardLogger.pruneOldLogs();
+  }
 });
 
 // --- Message handler (content script -> background) ---
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message && message.type === 'PAGE_DATA' && typeof message.url === 'string') {
+    const title = typeof message.title === 'string' ? message.title : '';
+    const tabId = sender && sender.tab && sender.tab.id;
     self.FocusGuardClassifier.classifyPage({
       url: message.url,
-      title: typeof message.title === 'string' ? message.title : '',
+      title,
     }).then((verdict) => {
       console.log('[FocusGuard] classify', message.url, '->',
         verdict.verdict, `(${verdict.reason}, ${verdict.confidence.toFixed(2)}, ${verdict.source})`);
       sendResponse(verdict);
+      logClassification({ url: message.url, title, tabId, verdict });
     }).catch((e) => {
       // Defensive: classifier promises to never reject, but just in case
       console.error('[FocusGuard] unexpected classifier error:', e);
@@ -103,9 +144,10 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     return;
   }
 
+  const title = tab.title || '';
   self.FocusGuardClassifier.classifyPage({
     url,
-    title: tab.title || '',
+    title,
   }).then((verdict) => {
     console.log('[FocusGuard] spa-classify', url, '->',
       verdict.verdict, `(${verdict.reason}, ${verdict.confidence.toFixed(2)}, ${verdict.source})`);
@@ -122,8 +164,31 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
         // the PAGE_DATA path will handle this navigation instead.
       });
     }
+
+    logClassification({ url, title, tabId, verdict });
   }).catch((e) => {
     console.error('[FocusGuard] unexpected classifier error (spa):', e);
   });
+});
+
+// --- Tab / window focus events for duration tracking ---
+
+chrome.tabs.onActivated.addListener(({ tabId }) => {
+  self.FocusGuardLogger.markTabActive(tabId);
+});
+
+chrome.windows.onFocusChanged.addListener(async (windowId) => {
+  if (windowId === chrome.windows.WINDOW_ID_NONE) {
+    self.FocusGuardLogger.markTabInactive();
+    return;
+  }
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, windowId });
+    if (tab) self.FocusGuardLogger.markTabActive(tab.id);
+  } catch (_) { /* ignore — window may have closed mid-query */ }
+});
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+  self.FocusGuardLogger.forgetTab(tabId);
 });
 
