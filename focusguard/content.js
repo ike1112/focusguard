@@ -3,22 +3,52 @@
  *
  * Injected into every web page via manifest content_scripts.
  * Responsibilities:
- *   - Extract page URL and title
- *   - Send page data to background worker for classification
- *   - (Phase 3) Inject warning overlay for blocked pages
+ *   - On full page load: extract URL/title, send PAGE_DATA, show overlay on block
+ *   - On SPA pushState nav: listen for SHOW_OVERLAY from background and mount overlay
  *
  * Runs at document_idle — DOM is ready, page is interactive.
  */
 
 'use strict';
 
-// --- Page data extraction and reporting ---
-
 (function () {
-  // Skip if no URL (shouldn't happen, but be safe)
   if (!window.location.href) return;
 
-  // Send page data to background for classification
+  // Dedupe overlay trigger by URL — on a full page load, both the
+  // PAGE_DATA response and the background's onUpdated/spa-classify path
+  // fire for the same URL, and we don't want to destroy+recreate the
+  // overlay twice (the countdown would visibly restart).
+  let overlayShownForUrl = null;
+
+  function triggerBlockOverlay(reason) {
+    const currentUrl = window.location.href;
+    if (overlayShownForUrl === currentUrl) return;
+    overlayShownForUrl = currentUrl;
+
+    try {
+      if (window.FocusGuardOverlay && typeof window.FocusGuardOverlay.show === 'function') {
+        window.FocusGuardOverlay.show({
+          reason: reason || '',
+          countdownMs: 5000,
+          onComplete: () => {
+            chrome.runtime.sendMessage({ type: 'CLOSE_TAB' }, () => {
+              // Tab is closing; the channel tears down and Chrome would
+              // otherwise log "message port closed". Read lastError to
+              // suppress it.
+              void chrome.runtime.lastError;
+            });
+          },
+        });
+      } else {
+        console.warn('[FocusGuard] overlay module missing — cannot render block UI');
+      }
+    } catch (e) {
+      console.warn('[FocusGuard] overlay failed:', e);
+    }
+  }
+
+  // --- Initial full-load classification ---
+
   chrome.runtime.sendMessage(
     {
       type: 'PAGE_DATA',
@@ -32,9 +62,20 @@
       }
 
       if (response && response.verdict === 'block') {
-        // Phase 3: inject warning overlay here
-        console.log('[FocusGuard] Page blocked (overlay coming in Phase 3)');
+        triggerBlockOverlay(response.reason);
       }
     }
   );
+
+  // --- SPA nav verdicts pushed from background ---
+  //
+  // content.js only runs once per full page load, so pushState navigations
+  // (YouTube, Reddit, Twitter) never re-run this file. background.js
+  // classifies SPA navs via chrome.tabs.onUpdated and pushes blocks here.
+
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message && message.type === 'SHOW_OVERLAY') {
+      triggerBlockOverlay(message.reason);
+    }
+  });
 })();

@@ -96,9 +96,10 @@ You will receive a URL and the page title. Classify as one of:
 
 Policy:
 - Moderate filtering. Allow legitimate research even on broad sites.
-- YouTube math tutorials, educational videos = allow. YouTube gaming, entertainment = block.
+- YouTube homepage (path "/" with no search query, e.g. https://www.youtube.com/ or https://youtube.com/) = allow. The bare landing page by itself is not off-task.
+- YouTube specific URLs (/watch, /results, /shorts, /gaming, /feed/trending, /@channel) classify by the topic in the title — math, science, history, tutorials, educational content = allow; gaming, entertainment, memes, trending feeds, music videos = block.
 - Wikipedia, news sites, dictionaries, reference sites = allow.
-- Roblox, Fortnite, TikTok, Instagram, Twitch, gaming news = block.
+- Roblox, Fortnite, TikTok, Instagram, Twitch, gaming news sites = block.
 - If truly uncertain, prefer allow (fail open).
 
 Respond ONLY with minified JSON in this exact shape — no prose, no markdown, no code fences:

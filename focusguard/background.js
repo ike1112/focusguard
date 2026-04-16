@@ -63,6 +63,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message && message.type === 'CLOSE_TAB') {
+    // Use sender.tab.id — never trust a tab id supplied in the message
+    // payload. A content script should only close the tab it runs in.
+    const tabId = sender && sender.tab && sender.tab.id;
+    if (typeof tabId === 'number') {
+      chrome.tabs.remove(tabId).catch((e) => {
+        console.warn('[FocusGuard] tabs.remove failed:', e);
+      });
+    }
+    return false;
+  }
+
   // Unknown message type — no async response
   return false;
 });
@@ -97,6 +109,19 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }).then((verdict) => {
     console.log('[FocusGuard] spa-classify', url, '->',
       verdict.verdict, `(${verdict.reason}, ${verdict.confidence.toFixed(2)}, ${verdict.source})`);
+
+    // SPA navigations skip content.js (only runs at document_idle on full
+    // loads), so the PAGE_DATA -> sendResponse path can't trigger the
+    // overlay here. Push the block verdict to the tab's content script.
+    if (verdict.verdict === 'block') {
+      chrome.tabs.sendMessage(tabId, {
+        type: 'SHOW_OVERLAY',
+        reason: verdict.reason || '',
+      }).catch(() => {
+        // Content script may not be injected yet (tab mid-load);
+        // the PAGE_DATA path will handle this navigation instead.
+      });
+    }
   }).catch((e) => {
     console.error('[FocusGuard] unexpected classifier error (spa):', e);
   });
