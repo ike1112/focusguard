@@ -1,0 +1,12 @@
+# Claude Code per-machine settings (permissions, etc.)
+.claude/settings.local.json
+
+# Ralph loop transient state (generated during execution, cleaned up on completion)
+.claude/prp-ralph.state.md
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
