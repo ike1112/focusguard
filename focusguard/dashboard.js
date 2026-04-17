@@ -9,14 +9,10 @@
 
 (function () {
   // --- Config ---
-  const LOCKOUT_THRESHOLD = 3;
-  const LOCKOUT_MS = 60_000;
   const DATE_PICKER_DAYS = 30;
 
   // --- State ---
   const state = {
-    failedAttempts: 0,
-    lockoutUntil: 0,
     selectedDate: todayKey(),
   };
 
@@ -88,15 +84,62 @@
     }
   }
 
+  // --- Persistent lockout ---
+  // authState survives reloads — only a correct password resets failCount.
+
+  async function getAuthState() {
+    try {
+      const { authState } = await chrome.storage.local.get('authState');
+      return authState || { failCount: 0, lockoutUntil: 0, lastFailAt: 0 };
+    } catch {
+      return { failCount: 0, lockoutUntil: 0, lastFailAt: 0 };
+    }
+  }
+
+  async function setAuthState(next) {
+    try { await chrome.storage.local.set({ authState: next }); } catch {}
+  }
+
+  function lockoutDurationFor(failCount) {
+    if (failCount < 3) return 0;
+    if (failCount === 3) return 60_000;
+    if (failCount === 4) return 5 * 60_000;
+    return 30 * 60_000;
+  }
+
+  async function recordFailure() {
+    const cur = await getAuthState();
+    const failCount = cur.failCount + 1;
+    const ms = lockoutDurationFor(failCount);
+    const next = {
+      failCount,
+      lockoutUntil: ms ? Date.now() + ms : 0,
+      lastFailAt: Date.now(),
+    };
+    await setAuthState(next);
+    return next;
+  }
+
+  async function clearAuthState() {
+    await setAuthState({ failCount: 0, lockoutUntil: 0, lastFailAt: 0 });
+  }
+
+  function formatRemaining(ms) {
+    const s = Math.ceil(ms / 1000);
+    if (s < 60) return s + 's';
+    const m = Math.ceil(s / 60);
+    return m + 'm';
+  }
+
   function wireAuth() {
     $('auth-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const err = $('auth-error');
       err.hidden = true;
 
-      if (Date.now() < state.lockoutUntil) {
-        const secs = Math.ceil((state.lockoutUntil - Date.now()) / 1000);
-        err.textContent = `Locked. Try again in ${secs}s.`;
+      const auth = await getAuthState();
+      if (auth.lockoutUntil && Date.now() < auth.lockoutUntil) {
+        err.textContent = `Locked. Try again in ${formatRemaining(auth.lockoutUntil - Date.now())}.`;
         err.hidden = false;
         return;
       }
@@ -104,18 +147,16 @@
       const password = $('auth-password').value;
       const result = await verifyPassword(password);
       if (!result.ok) {
-        state.failedAttempts += 1;
-        err.textContent = result.error || 'Wrong password.';
+        const next = await recordFailure();
+        err.textContent = next.lockoutUntil
+          ? `Wrong password. Locked for ${formatRemaining(next.lockoutUntil - Date.now())}.`
+          : (result.error || 'Wrong password.');
         err.hidden = false;
-        if (state.failedAttempts >= LOCKOUT_THRESHOLD) {
-          state.lockoutUntil = Date.now() + LOCKOUT_MS;
-          state.failedAttempts = 0;
-        }
         $('auth-password').value = '';
         return;
       }
 
-      state.failedAttempts = 0;
+      await clearAuthState();
       $('auth-password').value = '';
       showView('main');
       initMainView();
