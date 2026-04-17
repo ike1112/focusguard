@@ -235,6 +235,15 @@ Everything keeps working. Your API key, password, and history all stick around. 
 
 Yes — install it on each computer separately, each with its own copy of the API key. The activity log on each computer is separate (it's not synced across devices).
 
+### What if my child has more than one Chrome profile?
+
+Chrome keeps each profile's extensions completely separate — so FocusGuard only runs in the profile you installed it in. If your child switches to another Chrome profile (the little circle icon in the top-right of Chrome), FocusGuard isn't there and won't block anything.
+
+To cover this, you have two choices:
+
+- **Install FocusGuard in every profile** your child uses. Repeat the steps under [Installing FocusGuard](#installing-focusguard) from within each profile. Each one needs its own API key entry and parent password.
+- **Or, stop your child from making new profiles.** In Chrome's settings, under *You and Google → Profiles*, you can turn off profile creation. Combine with your operating system's parental controls for the strongest lock.
+
 ### Does the AI ever get it wrong?
 
 Sometimes. The AI is trained to lean toward "allow" when it's unsure, so it's more likely to let a borderline page through than to block a real homework page. If something important keeps getting blocked, check the dashboard to see the AI's reason — it can help you understand what happened.
