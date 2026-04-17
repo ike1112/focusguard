@@ -8,37 +8,72 @@
   <link rel="stylesheet" href="setup.css">
 </head>
 <body>
-  <section id="view-form" class="container">
-    <h1>FocusGuard Setup</h1>
-    <p class="subtitle">One-time configuration. Keep this page to yourself.</p>
-    <p class="reconfigure-notice" id="reconfigure-notice" hidden>
-      FocusGuard is already configured. Submitting will replace the stored API key and password.
-    </p>
+  <div class="bg-mesh" aria-hidden="true"></div>
 
-    <form id="setup-form" autocomplete="off">
-      <label for="api-key">Claude API key</label>
-      <input id="api-key" type="password" placeholder="sk-ant-api03-..." required spellcheck="false">
-      <p class="hint">Get one at <a href="https://console.anthropic.com/" target="_blank" rel="noreferrer noopener">console.anthropic.com</a>.</p>
+  <main class="auth-shell">
+    <section id="view-form" class="card setup-card">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true"></div>
+        <div class="brand-text">
+          <div class="brand-name">FocusGuard</div>
+          <div class="brand-sub">First-time setup</div>
+        </div>
+      </div>
 
-      <label for="password">Parent password</label>
-      <input id="password" type="password" required minlength="6">
+      <div class="heading">
+        <h1>Configure your dashboard</h1>
+        <p>One-time setup. Keep this page to yourself.</p>
+      </div>
 
-      <label for="password-confirm">Confirm password</label>
-      <input id="password-confirm" type="password" required minlength="6">
+      <p class="notice" id="reconfigure-notice" hidden>
+        <span class="notice-dot" aria-hidden="true"></span>
+        <span>FocusGuard is already configured. Submitting will replace the stored API key and password.</span>
+      </p>
 
-      <button type="submit" id="submit-btn">Save and activate</button>
-      <p class="status" id="status" hidden></p>
-      <p class="error" id="error" hidden></p>
-    </form>
-  </section>
+      <form id="setup-form" autocomplete="off">
+        <label for="api-key">Claude API key</label>
+        <input id="api-key" type="password" placeholder="sk-ant-api03-..." required spellcheck="false">
+        <p class="hint">
+          Get one at
+          <a href="https://console.anthropic.com/" target="_blank" rel="noreferrer noopener">console.anthropic.com</a>.
+        </p>
 
-  <section id="view-done" class="container" hidden>
-    <h1>Setup complete.</h1>
-    <p>FocusGuard is now active on this browser.</p>
-    <p>Open the parent dashboard at any time:</p>
-    <a href="dashboard.html" class="button-primary">Open dashboard</a>
-    <p class="muted small">Bookmark this page for yourself; the child shouldn't know the URL.</p>
-  </section>
+        <label for="password">Parent password</label>
+        <input id="password" type="password" required minlength="6" placeholder="At least 6 characters">
+
+        <label for="password-confirm">Confirm password</label>
+        <input id="password-confirm" type="password" required minlength="6" placeholder="Re-enter password">
+
+        <button type="submit" id="submit-btn" class="btn-primary">
+          <span>Save and activate</span>
+          <svg class="arrow" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M3 8h10m0 0L9 4m4 4L9 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <p class="status" id="status" hidden></p>
+        <p class="error" id="error" hidden></p>
+      </form>
+    </section>
+
+    <section id="view-done" class="card done-card" hidden>
+      <div class="success-ring" aria-hidden="true">
+        <svg viewBox="0 0 28 28" fill="none">
+          <path d="M7 14.5l4.5 4.5L21 9.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="heading heading-center">
+        <h1>Setup complete</h1>
+        <p>FocusGuard is now active on this browser.</p>
+      </div>
+      <a href="dashboard.html" class="btn-primary full-width">
+        <span>Open dashboard</span>
+        <svg class="arrow" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M3 8h10m0 0L9 4m4 4L9 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </a>
+      <p class="footnote">Bookmark this page for yourself. Your child should not know the URL.</p>
+    </section>
+  </main>
 
   <script src="setup.js"></script>
 </body>

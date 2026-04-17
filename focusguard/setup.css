@@ -1,47 +1,112 @@
-/* setup.css — Setup page styles. Base tokens in base.css. */
+/* setup.css — First-time setup page. Design system in base.css. */
 
-:root {
-  --warm-gray: #e8e2da;
-  --accent-sage: #5a7a62;
-  --accent-rose: #b35a5a;
-  --card-bg: #fffdf9;
+.setup-card,
+.done-card {
+  max-width: 440px;
+  padding: 36px 32px 32px;
 }
 
-.subtitle { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+.setup-card .brand { margin-bottom: 24px; }
 
-.reconfigure-notice {
-  background: var(--card-bg);
-  border: 1px solid var(--warm-gray);
-  border-left: 3px solid var(--accent-rose);
-  padding: 10px 14px; border-radius: 6px;
-  font-size: 13px; color: var(--ink); margin-bottom: 20px;
+.heading h1 {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+  background: linear-gradient(180deg, #ffffff 0%, #c9c9d1 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.heading p {
+  color: var(--muted);
+  font-size: 13.5px;
+  margin-top: 6px;
+}
+.heading { margin-bottom: 22px; }
+.heading-center { text-align: center; }
+
+/* Reconfigure notice — pill-style card with a rose dot. */
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  margin-bottom: 18px;
+  font-size: 12.5px;
+  color: var(--ink);
+  background: rgba(251, 113, 133, 0.06);
+  border: 1px solid rgba(251, 113, 133, 0.18);
+  border-radius: var(--r-md);
+  line-height: 1.5;
+}
+.notice-dot {
+  width: 7px; height: 7px;
+  border-radius: 999px;
+  background: var(--danger);
+  box-shadow: 0 0 8px var(--danger);
+  margin-top: 6px;
+  flex: 0 0 auto;
 }
 
-form label {
-  display: block; font-size: 13px; color: var(--muted);
-  margin: 14px 0 6px;
-}
-form input {
-  width: 100%; padding: 10px 12px; font-size: 14px;
-  border: 1px solid var(--warm-gray); border-radius: 6px;
-  background: var(--card-bg); color: var(--ink);
-}
-form input:focus { outline: 2px solid var(--accent-sage); outline-offset: 2px; }
+/* Form rhythm — tighter than dashboard's form layout. */
+#setup-form { display: flex; flex-direction: column; }
+#setup-form label { margin-top: 14px; }
+#setup-form label:first-of-type { margin-top: 0; }
+#setup-form input { margin-bottom: 0; }
 
-.hint { color: var(--muted); font-size: 12px; margin-top: 6px; }
-.hint a { color: var(--ink); }
-
-button[type="submit"], .button-primary {
-  margin-top: 20px;
-  display: inline-block;
-  padding: 10px 20px;
-  font-size: 14px; font-weight: 500;
-  background: var(--ink); color: var(--paper);
-  border: 0; border-radius: 6px; cursor: pointer;
+.hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.hint a {
+  color: var(--ink);
   text-decoration: none;
+  border-bottom: 1px dashed var(--border-strong);
+  padding-bottom: 1px;
+  transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease);
 }
-button[disabled] { opacity: 0.6; cursor: not-allowed; }
+.hint a:hover {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
 
-.status { color: var(--muted); font-size: 13px; margin-top: 14px; }
-.error  { color: var(--accent-rose); font-size: 13px; margin-top: 14px; }
-.small  { font-size: 12px; }
+.btn-primary.full-width { width: 100%; }
+#submit-btn {
+  margin-top: 22px;
+  width: 100%;
+}
+
+#setup-form .status,
+#setup-form .error { margin-top: 14px; }
+
+/* Done view */
+.success-ring {
+  width: 56px; height: 56px;
+  margin: 6px auto 18px;
+  display: grid; place-items: center;
+  color: var(--success);
+  background: var(--success-glow);
+  border: 1px solid rgba(52, 211, 153, 0.22);
+  border-radius: 50%;
+  box-shadow: 0 0 0 6px rgba(52, 211, 153, 0.08);
+  animation: ring-in 420ms var(--ease) both;
+}
+.success-ring svg { width: 28px; height: 28px; }
+@keyframes ring-in {
+  0%   { transform: scale(0.6); opacity: 0; }
+  60%  { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1);    opacity: 1; }
+}
+
+.footnote {
+  margin-top: 16px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+@media (max-width: 480px) {
+  .setup-card, .done-card { padding: 28px 22px 24px; }
+}

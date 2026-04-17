@@ -8,48 +8,126 @@
   <link rel="stylesheet" href="dashboard.css">
 </head>
 <body>
-  <section id="view-auth" class="container auth-container">
-    <h1>FocusGuard</h1>
-    <form id="auth-form" autocomplete="off">
-      <label for="auth-password">Parent password</label>
-      <input id="auth-password" type="password" autofocus required>
-      <button type="submit">Unlock</button>
-      <p id="auth-error" class="error" hidden></p>
-    </form>
+  <div class="bg-mesh" aria-hidden="true"></div>
+
+  <section id="view-auth" class="auth-shell">
+    <div class="card auth-card">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true"></div>
+        <div class="brand-text">
+          <div class="brand-name">FocusGuard</div>
+          <div class="brand-sub">Parent Dashboard</div>
+        </div>
+      </div>
+      <form id="auth-form" autocomplete="off">
+        <label for="auth-password">Password</label>
+        <input id="auth-password" type="password" autofocus required placeholder="Enter parent password">
+        <button type="submit" class="btn-primary">
+          <span>Unlock</span>
+          <svg class="arrow" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M3 8h10m0 0L9 4m4 4L9 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <p id="auth-error" class="error" hidden></p>
+      </form>
+    </div>
   </section>
 
-  <section id="view-main" class="container main-container" hidden>
-    <header class="header">
-      <h1>FocusGuard</h1>
-      <div class="header-controls">
-        <label for="date-picker" class="sr-only">Date</label>
-        <select id="date-picker" aria-label="Date"></select>
-        <button id="refresh-btn" class="ghost" type="button">Refresh</button>
-        <button id="logout-btn" class="ghost">Log out</button>
+  <section id="view-main" class="app-shell" hidden>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="brand brand-compact">
+          <div class="brand-mark" aria-hidden="true"></div>
+          <div class="brand-text">
+            <div class="brand-name">FocusGuard</div>
+            <div class="brand-sub">Parent Dashboard</div>
+          </div>
+        </div>
+        <div class="topbar-controls">
+          <label for="date-picker" class="sr-only">Date</label>
+          <div class="select-wrap">
+            <select id="date-picker" aria-label="Date"></select>
+            <svg class="select-chev" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <button id="refresh-btn" class="btn btn-ghost" type="button" aria-label="Refresh">
+            <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M2 8a6 6 0 0 1 10.5-4M14 8a6 6 0 0 1-10.5 4M13 2v3h-3M3 14v-3h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>Refresh</span>
+          </button>
+          <button id="logout-btn" class="btn btn-ghost" type="button" aria-label="Log out">
+            <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M10 4V3a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-1M7 8h8m0 0l-3-3m3 3l-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>Log out</span>
+          </button>
+        </div>
       </div>
     </header>
 
-    <section class="stats" id="stats">
-      <div class="stat">
-        <div class="stat-label">Time online</div>
-        <div class="stat-value" id="stat-time">&mdash;</div>
-      </div>
-      <div class="stat">
-        <div class="stat-label">Educational</div>
-        <div class="stat-value" id="stat-educational">&mdash;</div>
-      </div>
-      <div class="stat">
-        <div class="stat-label">Blocked</div>
-        <div class="stat-value" id="stat-blocked">&mdash;</div>
-      </div>
-      <div class="stat stat-wide">
-        <div class="stat-label">Top domains</div>
-        <ol class="stat-list" id="stat-top-domains"></ol>
-      </div>
-    </section>
+    <main class="app-main">
+      <section class="hero">
+        <div class="hero-eyebrow">Activity snapshot</div>
+        <h1 class="hero-title">Today's focus</h1>
+        <p class="hero-sub">How your child's browsing breaks down across time, learning, and blocked visits.</p>
+      </section>
 
-    <section class="feed" id="feed" aria-live="polite"></section>
-    <p class="muted empty-state" id="empty-state" hidden>No activity for this day.</p>
+      <section class="bento" aria-label="Stats">
+        <article class="tile tile-hero">
+          <div class="tile-label">Time online</div>
+          <div class="tile-value tile-value-hero" id="stat-time">&mdash;</div>
+          <div class="tile-foot">
+            <span class="pulse"></span>
+            <span>Tracked across all tabs today</span>
+          </div>
+        </article>
+
+        <article class="tile tile-success">
+          <div class="tile-label">Educational</div>
+          <div class="tile-value" id="stat-educational">&mdash;</div>
+          <div class="tile-foot">of total time</div>
+        </article>
+
+        <article class="tile tile-danger">
+          <div class="tile-label">Blocked visits</div>
+          <div class="tile-value" id="stat-blocked">&mdash;</div>
+          <div class="tile-foot">closed by FocusGuard</div>
+        </article>
+
+        <article class="tile tile-wide">
+          <div class="tile-label">Top domains by time</div>
+          <ol class="tile-list" id="stat-top-domains"></ol>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">Activity</h2>
+            <p class="panel-sub">Newest first. Hover a row for the full URL.</p>
+          </div>
+        </div>
+        <div class="panel-thead">
+          <div>Time</div>
+          <div>Verdict</div>
+          <div>Page</div>
+          <div class="ta-right">Duration</div>
+        </div>
+        <div class="feed" id="feed" aria-live="polite"></div>
+        <div class="empty-state" id="empty-state" hidden>
+          <div class="empty-icon" aria-hidden="true">
+            <svg viewBox="0 0 32 32" fill="none">
+              <circle cx="16" cy="16" r="12" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 3"/>
+              <path d="M12 16h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div class="empty-title">No activity for this day</div>
+          <div class="empty-sub">Entries appear here once your child browses the web.</div>
+        </div>
+      </section>
+    </main>
   </section>
 
   <script src="dashboard.js"></script>

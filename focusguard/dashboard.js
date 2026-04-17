@@ -219,18 +219,24 @@
       const badgeClass = e.verdict === 'block' ? 'badge-block' : 'badge-allow';
       const confStr = typeof e.confidence === 'number' ? e.confidence.toFixed(2) : '—';
       const reasonLine = e.reason
-        ? `<div class="entry-reason">reason: ${escapeHtml(e.reason)}</div>`
+        ? `<div class="entry-reason">${escapeHtml(e.reason)}</div>`
         : '';
-      const sourceTag = e.source === 'cache' ? 'cache' : '';
+      const metaParts = [];
+      if (e.domain) metaParts.push(escapeHtml(e.domain));
+      metaParts.push(`${confStr} conf`);
+      if (e.source === 'cache') metaParts.push('cache');
+      const metaHtml = metaParts
+        .map((p) => `<span>${p}</span>`)
+        .join('<span class="dot"></span>');
       node.innerHTML = `
         <div class="entry-time">${formatTime(e.ts)}</div>
         <span class="badge ${badgeClass}">${escapeHtml(e.verdict)}</span>
         <div class="entry-main">
           <div class="entry-title" title="${escapeHtml(e.url)}">${escapeHtml(e.title || e.url)}</div>
-          <div class="entry-meta">${escapeHtml(e.domain || '')} · ${formatDuration(e.durationMs)} · ${confStr} conf</div>
+          <div class="entry-meta">${metaHtml}</div>
           ${reasonLine}
         </div>
-        <div class="entry-right">${escapeHtml(sourceTag)}</div>
+        <div class="entry-right">${formatDuration(e.durationMs)}</div>
       `;
       frag.appendChild(node);
     }
