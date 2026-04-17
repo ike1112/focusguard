@@ -8,10 +8,38 @@
   <link rel="stylesheet" href="setup.css">
 </head>
 <body>
-  <div class="container">
+  <section id="view-form" class="container">
     <h1>FocusGuard Setup</h1>
-    <p>Welcome to FocusGuard. Setup form coming in Phase 6.</p>
-    <p class="muted">This page will collect your Claude API key and parent password.</p>
-  </div>
+    <p class="subtitle">One-time configuration. Keep this page to yourself.</p>
+    <p class="reconfigure-notice" id="reconfigure-notice" hidden>
+      FocusGuard is already configured. Submitting will replace the stored API key and password.
+    </p>
+
+    <form id="setup-form" autocomplete="off">
+      <label for="api-key">Claude API key</label>
+      <input id="api-key" type="password" placeholder="sk-ant-api03-..." required spellcheck="false">
+      <p class="hint">Get one at <a href="https://console.anthropic.com/" target="_blank" rel="noreferrer noopener">console.anthropic.com</a>.</p>
+
+      <label for="password">Parent password</label>
+      <input id="password" type="password" required minlength="6">
+
+      <label for="password-confirm">Confirm password</label>
+      <input id="password-confirm" type="password" required minlength="6">
+
+      <button type="submit" id="submit-btn">Save and activate</button>
+      <p class="status" id="status" hidden></p>
+      <p class="error" id="error" hidden></p>
+    </form>
+  </section>
+
+  <section id="view-done" class="container" hidden>
+    <h1>Setup complete.</h1>
+    <p>FocusGuard is now active on this browser.</p>
+    <p>Open the parent dashboard at any time:</p>
+    <a href="dashboard.html" class="button-primary">Open dashboard</a>
+    <p class="muted small">Bookmark this page for yourself; the child shouldn't know the URL.</p>
+  </section>
+
+  <script src="setup.js"></script>
 </body>
 </html>
