@@ -8,10 +8,50 @@
   <link rel="stylesheet" href="dashboard.css">
 </head>
 <body>
-  <div class="container">
-    <h1>FocusGuard Dashboard</h1>
-    <p>Parent activity dashboard coming in Phase 5.</p>
-    <p class="muted">This page will show browsing activity, stats, and history.</p>
-  </div>
+  <section id="view-auth" class="container auth-container">
+    <h1>FocusGuard</h1>
+    <form id="auth-form" autocomplete="off">
+      <label for="auth-password">Parent password</label>
+      <input id="auth-password" type="password" autofocus required>
+      <button type="submit">Unlock</button>
+      <p id="auth-error" class="error" hidden></p>
+    </form>
+  </section>
+
+  <section id="view-main" class="container main-container" hidden>
+    <header class="header">
+      <h1>FocusGuard</h1>
+      <div class="header-controls">
+        <label for="date-picker" class="sr-only">Date</label>
+        <select id="date-picker" aria-label="Date"></select>
+        <button id="refresh-btn" class="ghost" type="button">Refresh</button>
+        <button id="logout-btn" class="ghost">Log out</button>
+      </div>
+    </header>
+
+    <section class="stats" id="stats">
+      <div class="stat">
+        <div class="stat-label">Time online</div>
+        <div class="stat-value" id="stat-time">&mdash;</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Educational</div>
+        <div class="stat-value" id="stat-educational">&mdash;</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Blocked</div>
+        <div class="stat-value" id="stat-blocked">&mdash;</div>
+      </div>
+      <div class="stat stat-wide">
+        <div class="stat-label">Top domains</div>
+        <ol class="stat-list" id="stat-top-domains"></ol>
+      </div>
+    </section>
+
+    <section class="feed" id="feed" aria-live="polite"></section>
+    <p class="muted empty-state" id="empty-state" hidden>No activity for this day.</p>
+  </section>
+
+  <script src="dashboard.js"></script>
 </body>
 </html>
