@@ -1,384 +1,274 @@
 # FocusGuard
 
-FocusGuard is a helper for Chrome that keeps kids focused while doing homework. When your child opens a website, FocusGuard quietly asks an AI whether the page looks like schoolwork or a distraction. If it's a distraction (like games, TikTok, or YouTube videos about Minecraft), a full-screen warning appears for 5 seconds and then the tab closes by itself.
+**A quiet helper that keeps kids focused on homework.**
 
-It was built with an 11-year-old in mind — someone who does homework on Google Classroom but keeps wandering off to Roblox or gaming videos. You set it up once, and after that it runs silently in the background. Your child never sees an icon, a popup, or a menu.
+When your child opens a website, FocusGuard looks at the page and decides if it's schoolwork or a distraction. Homework stuff (Google Classroom, Wikipedia, Khan Academy, a math site…) passes through like normal — your child won't even know FocusGuard is there. But if they open Roblox, a gaming YouTube video, TikTok, or something else off-task, a full-screen message appears saying **"This doesn't look like homework,"** a 5-second timer counts down, and the tab closes by itself.
 
-- **Everything stays on your computer.** No website, no company server, no account. Nothing about your child's browsing is sent anywhere except the one AI question.
-- **Only you can see the activity.** There's a hidden page where you log in with a password to see what your child has been doing.
-- **It's gentle.** No loud alarms, no scary messages. Just a calm 5-second warning, then the tab closes.
+You install it once on your child's computer, take two minutes to set it up, and from then on it runs in the background. No icons, no popups, no buttons — nothing for your child to see or turn off.
+
+- 🔒 **Private by design.** Nothing about your child's browsing goes to a company, a website, or an account. It all stays on the one computer.
+- 👨‍👩‍👧 **Only you can see the activity.** There's a hidden page where you type a password to see every site your child has opened today (and up to the last 30 days).
+- 🌱 **Gentle, not scary.** No alarms or lectures. Just a calm "please get back to homework" screen.
+- 💰 **Almost free.** FocusGuard itself costs nothing. The AI that checks the pages usually costs a few cents a month — you top up a small balance and that's it.
+
+> Developers: see [README-developers.md](README-developers.md) for architecture, file layout, and API details.
 
 ---
 
-## Quick start for parents (no technical jargon)
+## Table of contents
 
-### What you need first
+1. [What you need before you start](#what-you-need-before-you-start)
+2. [Installing FocusGuard](#installing-focusguard)
+3. [First-time setup](#first-time-setup)
+4. [What your child sees (and doesn't see)](#what-your-child-sees-and-doesnt-see)
+5. [Checking what your child has been doing](#checking-what-your-child-has-been-doing)
+6. [What it costs](#what-it-costs)
+7. [Your privacy](#your-privacy)
+8. [Common questions](#common-questions)
+9. [Uninstalling](#uninstalling)
 
-1. **A computer with Google Chrome.** If you don't have Chrome, download it from [google.com/chrome](https://www.google.com/chrome/).
-2. **An "API key" from Anthropic.** This is a secret code that lets your computer ask the AI questions. Think of it like a prepaid phone card — you pay a tiny amount (usually a few cents a month for normal browsing) based on how many questions get asked.
-   - Go to [console.anthropic.com](https://console.anthropic.com/) and make an account.
-   - Add a small amount of money (even $5 lasts a long time).
-   - Find the "API keys" section and click "Create key."
-   - Copy the long code that starts with `sk-ant-`. Keep it private — don't share it or paste it into random websites. You'll need it in a moment.
+---
 
-### How to install FocusGuard
+## What you need before you start
 
-1. Download this project to your computer (click the green "Code" button on GitHub → "Download ZIP", then unzip it). You'll end up with a folder called `FocusGuard` that contains another folder called `focusguard`.
-2. Open Chrome and type this into the address bar: `chrome://extensions`
-3. In the top-right corner of that page, turn on the switch labeled **"Developer mode."**
-4. A new button appears: **"Load unpacked."** Click it.
-5. A file picker opens. Find the `FocusGuard` folder you downloaded, open it, and select the **`focusguard`** folder inside. Click "Select folder."
-6. A new tab opens automatically — this is the setup page.
+### 1. A computer with Google Chrome
 
-### How to set it up
+FocusGuard only works inside the Chrome browser. If Chrome isn't on your child's computer yet, get it free from [google.com/chrome](https://www.google.com/chrome/).
 
-On the setup page:
+> Other Chromium-based browsers (like Microsoft Edge or Brave) will probably work too, but haven't been tested.
 
-1. **Paste the API key** you copied earlier (the `sk-ant-...` code) into the first box.
-2. **Pick a parent password.** This is what you'll use later to see what your child did. Use at least 6 characters, and pick something your child can't guess. **Write it down somewhere safe** — there's no "forgot password" button.
-3. Type the same password again in the confirmation box.
+### 2. An "API key" from Anthropic
+
+An API key is just a secret code that lets your computer ask the AI whether a web page is schoolwork or not. Think of it like a prepaid phone card — you load a few dollars onto it, and each time your computer asks a question, it uses up a tiny, tiny amount. A normal month of homework browsing costs anywhere from a few cents to about a dollar.
+
+Here's how to get one:
+
+1. Go to **[console.anthropic.com](https://console.anthropic.com/)** and sign up with an email. It's the company that makes the AI.
+2. After signing in, look for a section called **"Billing"** or **"Plans & billing"** and add a small amount of money. Even **$5 usually lasts many months.** (You can also set a spending limit so you're never surprised by a charge.)
+3. Now look for a section called **"API keys"** and click a button like **"Create Key."** Give it any name you want (like "FocusGuard").
+4. A long code will appear that starts with `sk-ant-` followed by lots of letters and numbers. **Copy it** and keep it somewhere safe for the next step.
+
+> ⚠️ Treat this code like a password. Don't share it or paste it into random websites — anyone who has it could use up your balance.
+
+---
+
+## Installing FocusGuard
+
+1. **Download this project.** On the project's GitHub page, click the green **"Code"** button, then **"Download ZIP."** Save it somewhere you can find it (like your Desktop).
+2. **Unzip it.** Right-click the ZIP file and choose "Extract All" (Windows) or double-click it (Mac). You'll get a folder named something like `FocusGuard-main`. Inside that folder, there's another folder called `focusguard` — this is the one we'll use.
+3. **Open Chrome's extension page.** In Chrome's address bar at the top, type: `chrome://extensions` and press Enter.
+4. **Turn on Developer mode.** In the top-right corner of that page, flip the switch labeled **"Developer mode."**
+5. **Click "Load unpacked."** A new button appears at the top-left. Click it.
+6. **Choose the `focusguard` folder.** A file picker opens — navigate to where you unzipped the download and pick the **inner `focusguard` folder** (the one with files like `manifest.json` inside). Click "Select folder."
+
+That's it — Chrome installs it right away. A new tab opens automatically with the setup page.
+
+---
+
+## First-time setup
+
+The setup page is where you plug in your API key and pick a parent password.
+
+1. **Paste your API key** (the `sk-ant-...` code you copied earlier) into the first box.
+2. **Pick a parent password.** This is what you'll type later to see the activity dashboard.
+   - Use at least 6 characters.
+   - Pick something your child can't easily guess (not "password," not a pet's name, not a birthday).
+   - **Write it down somewhere safe.** There is no "Forgot password" button — if you lose it, the only way to reset is to reinstall FocusGuard (which erases the activity history).
+3. **Type the same password again** in the confirmation box.
 4. Click **"Save and activate."**
 
-The page will say "Setup complete." That's it — FocusGuard is now watching.
+FocusGuard will quickly check that your API key works (this takes a second or two). When you see **"Setup complete,"** you're done. You can close the tab.
 
-### What happens from now on
-
-- When your child opens a homework page (Google Classroom, Khan Academy, Wikipedia, a math site, etc.), nothing happens. They won't even know FocusGuard exists.
-- When your child opens a distraction (Roblox, gaming videos, TikTok, etc.), a dark screen appears that says **"This doesn't look like homework."** A countdown goes from 5 down to 0, and then the tab closes itself.
-- There is no icon, no button, no popup. The extension is invisible on purpose.
-
-### How to check what your child did
-
-1. In Chrome's address bar, type: `chrome://extensions`
-2. Find **FocusGuard** in the list. Below its name, there's an ID that looks like `abcdefghijklmnop...` — a long string of letters. Copy it.
-3. In the address bar, type: `chrome-extension://` then paste the ID, then add `/dashboard.html`. So the full address looks like: `chrome-extension://abcdefghijklmnop.../dashboard.html`
-4. **Tip:** bookmark this page for yourself once you've opened it. Just don't name the bookmark something obvious like "spy on kid" — give it a boring name like "Work" so your child doesn't get curious.
-5. Enter your parent password. If you type it wrong 3 times, you have to wait 1 minute before trying again.
-6. You'll see:
-   - **Today's activity** — every website your child opened, with the time, how long they spent there, whether it was allowed or blocked, and why the AI decided that.
-   - **Numbers at the top** — total time online, how much of that was educational, how many distractions got blocked, and their most-visited sites.
-   - **A date picker** to scroll back through the last 30 days.
-
-### If something goes wrong
-
-- **Everything is allowed, nothing is getting blocked.** Your API key might be missing or wrong. Go to `chrome-extension://<id>/setup.html` and do setup again.
-- **You forgot your password.** There's no way to recover it — but you can reset it. Go to `chrome://extensions`, find FocusGuard, click **"Remove,"** then install it again and pick a new password. (You'll lose the past activity history when you do this.)
-- **You want to uninstall it.** Go to `chrome://extensions`, find FocusGuard, click **"Remove."** Everything — the API key, password, and activity history — is deleted from your computer.
-- **Your child found out about it.** That's okay — the goal isn't really to spy, it's to help them stay focused. Some parents find it works better to just tell their child: "This thing closes distracting tabs while you do homework." Up to you.
-
-### What does it cost?
-
-Only what you pay Anthropic for AI questions. Each page your child opens costs a tiny fraction of a cent. In practice, a normal month of browsing costs a few cents to maybe a dollar. You control the budget on Anthropic's website and can set a monthly limit so you're never surprised.
-
-FocusGuard itself is free. There's no subscription.
+From this moment on, FocusGuard is watching every page.
 
 ---
 
-## Table of contents (technical details below)
+## What your child sees (and doesn't see)
 
-1. [How it works](#how-it-works)
-2. [Install & first-time setup](#install--first-time-setup)
-3. [Using the parent dashboard](#using-the-parent-dashboard)
-4. [Where data is stored](#where-data-is-stored)
-5. [Privacy & security model](#privacy--security-model)
-6. [File layout](#file-layout)
-7. [Development notes](#development-notes)
-8. [Troubleshooting](#troubleshooting)
-9. [Limitations](#limitations)
+### What they see
 
----
+- **On homework pages** (Google Classroom, Wikipedia, Khan Academy, math/science sites, educational YouTube videos, reference sites): nothing. The page loads normally. No message, no delay, no change.
+- **On distraction pages** (Roblox, gaming videos, TikTok, Instagram, shopping, memes, etc.): the whole browser window goes dark with this message:
 
-## How it works
+  > **This doesn't look like homework.**
+  >
+  > Reason: *(a short explanation from the AI)*
+  >
+  > **Closing tab in 5**
 
-```
- ┌─────────────────────────────────────────────────────────────────┐
- │ Chrome tab                                                      │
- │                                                                 │
- │   overlay.js  ──► Shadow-DOM warning UI (only on "block")       │
- │   content.js  ──► sends PAGE_DATA (url, title)                  │
- │                                                                 │
- └──────────────────────────────┬──────────────────────────────────┘
-                                │ chrome.runtime.sendMessage
-                                ▼
- ┌─────────────────────────────────────────────────────────────────┐
- │ background.js  (MV3 service worker)                             │
- │                                                                 │
- │   classifier.js  ── fetch(api.anthropic.com/v1/messages)        │
- │                     model: claude-haiku-4-5                     │
- │                     returns {verdict, reason, confidence}       │
- │                                                                 │
- │   logger.js      ── append entry to chrome.storage.local        │
- │                     key: log:YYYY-MM-DD                         │
- │                     + track active-tab duration                 │
- │                     + prune > 30 days on a daily alarm          │
- │                                                                 │
- │   tabs.onUpdated ── re-classify SPA navigations (YouTube,       │
- │                     Reddit, etc. — where content.js doesn't     │
- │                     re-fire because the page never reloads)     │
- └─────────────────────────────────────────────────────────────────┘
-                                │
-                                ▼
- ┌─────────────────────────────────────────────────────────────────┐
- │ dashboard.html  (chrome-extension://<id>/dashboard.html)        │
- │   password-gated, reads logs from chrome.storage.local          │
- └─────────────────────────────────────────────────────────────────┘
-```
+  The number counts down — 5, 4, 3, 2, 1 — and then the tab closes automatically. The overlay cannot be clicked through or dismissed.
 
-### The classification loop
+### What they don't see
 
-1. A page loads. `content.js` (injected on every URL at `document_idle`) sends `{type: "PAGE_DATA", url, title}` to the service worker.
-2. `background.js` hands the URL/title to `classifier.js`, which:
-   - Returns a cached verdict if the URL has been seen this worker lifetime (in-memory LRU, 500 entries).
-   - Otherwise calls `POST https://api.anthropic.com/v1/messages` with model `claude-haiku-4-5`, a system prompt tuned for moderate filtering, and a 15 s timeout.
-   - Parses the JSON response (`{verdict, reason, confidence}`) and caches it.
-3. The verdict is sent back to the content script:
-   - `allow` → nothing happens; the page is invisible to the user.
-   - `block` → `overlay.js` mounts a Shadow-DOM warning with a 5-second countdown. When the timer hits zero, the content script asks the service worker to close the tab via `chrome.tabs.remove()`.
-4. Every classified visit is logged via `logger.js`.
+- **No icon** in Chrome's toolbar.
+- **No popup** or menu.
+- **No setting** inside Chrome that mentions FocusGuard.
+- **No notification** when something gets blocked besides the 5-second message itself.
 
-### SPA navigations
+FocusGuard is intentionally invisible so it feels less like being watched and more like the computer "just works that way."
 
-`content.js` only runs once per full page load, so single-page-app navigations (YouTube video clicks, Reddit subreddit changes, Twitter feeds) would otherwise slip by. `background.js` subscribes to `chrome.tabs.onUpdated` and re-classifies whenever the URL changes. If the new URL is blocked, it pushes a `SHOW_OVERLAY` message to the tab's content script so the overlay still appears.
-
-### Fail-open everywhere
-
-If the classifier module fails to load, if the API key is missing, if the request times out, if the JSON response is malformed — the verdict is always `allow`. The explicit goal is that bugs must not prevent the child from using the browser. See `background.js:21` and `classifier.js:183`.
-
-### Prompt-injection defense
-
-Page titles feed into the Claude prompt. Since a page can set `document.title` to anything, the classifier strips newlines and caps length before sending (`classifier.js:117`), and the overlay HTML-escapes any classifier-returned `reason` string before rendering (`overlay.js:74`).
+> If your child is tech-savvy enough to explore `chrome://extensions`, they will see FocusGuard listed there and could turn it off. FocusGuard isn't a hard lock — it's a gentle guide. For stricter control, combine it with your operating system's built-in parental controls.
 
 ---
 
-## Install & first-time setup
+## Checking what your child has been doing
 
-### Prerequisites
+The parent dashboard is a hidden page inside the extension. Only you know how to open it.
 
-- Google Chrome (or any Chromium-based browser that supports MV3 extensions).
-- A Claude API key. Get one at [console.anthropic.com](https://console.anthropic.com/). Pay-as-you-go usage with Haiku is cheap — a typical browsing session is fractions of a cent.
+### Opening the dashboard
 
-### Load the extension
+1. In Chrome's address bar, type: `chrome://extensions` and press Enter.
+2. Find **FocusGuard** in the list of extensions.
+3. Just under the name, you'll see an **ID** — a long string of letters that looks like `abcdefghijklmnopqrstuvwxyz123456`. Copy this ID.
+4. In the address bar, type:
 
-1. Clone or download this repo.
-2. Open `chrome://extensions` in Chrome.
-3. Turn on **Developer mode** (top right).
-4. Click **Load unpacked** and select the `focusguard/` folder (not the repo root).
-5. The extension installs and immediately opens a setup tab at `chrome-extension://<id>/setup.html`.
+   ```
+   chrome-extension://<paste-the-id-here>/dashboard.html
+   ```
 
-### First-time setup
+   For example: `chrome-extension://abcdefghijklmnopqrstuvwxyz123456/dashboard.html`
 
-The setup form (`setup.html`) asks for:
+5. Press Enter. You'll see the password screen.
 
-- **Claude API key** — must start with `sk-ant-`. The form makes a single `max_tokens: 1` call to Anthropic to confirm the key is valid before saving it.
-- **Parent password** — at least 6 characters. Used later to unlock the dashboard. Hashed before storage (see below).
+### 💡 Make it easier for yourself
 
-On submit:
-- The API key is stored as-is in `chrome.storage.local` under `apiKey`.
-- A random 16-byte salt is generated with `crypto.getRandomValues`, then `sha256(salt + ":" + password)` is stored as `parentPassword: {salt, hash}`.
-- A success screen shows a link to the dashboard.
+**Bookmark the dashboard page** so you don't have to look up the ID each time. But give the bookmark a boring name — like "Work notes" or "Recipes" — so your child doesn't get curious about it.
 
-You can re-run setup any time by navigating to `chrome-extension://<id>/setup.html`. Re-submitting replaces both the API key and the password (a fresh salt is generated — salts are never reused).
+### What's on the dashboard
 
-### After setup
+After you type your parent password, you'll see:
 
-There is **no browser action, no popup, no icon indication**. The extension is intentionally silent. The only visible surfaces are:
+- **Today's activity** at the top in big numbers:
+  - *Time online* — how long your child's been actively using the browser.
+  - *Educational* — what percentage of that time was on allowed sites.
+  - *Blocked* — how many distractions FocusGuard stopped today.
+  - *Top domains* — your child's five most-used sites.
 
-- The warning overlay on blocked pages.
-- `setup.html` if you re-open it manually.
-- `dashboard.html` if you navigate to it manually.
+- **A full list** of every site they've opened today, newest first. Each entry shows:
+  - The time they opened it.
+  - A green "allow" tag or a red "block" tag.
+  - The page title and website name.
+  - How long they spent on it.
+  - The AI's short reason (like "educational research" or "entertainment video").
 
-Bookmark `chrome-extension://<id>/dashboard.html` for yourself and don't share that bookmark with the child.
+- **A date picker** to scroll back through the last 30 days.
 
----
+- A **Log out** button — tap it when you're done so the info isn't sitting on screen.
 
-## Using the parent dashboard
-
-Open `chrome-extension://<id>/dashboard.html`. The extension ID is visible on the `chrome://extensions` page.
-
-1. Enter the parent password. After 3 wrong attempts you're locked out for 60 seconds.
-2. The main view shows today's activity:
-   - **Time online** — total active-tab duration.
-   - **Educational** — percentage of active time on `allow` pages.
-   - **Blocked** — count of block verdicts.
-   - **Top domains** — ranked by time spent, not visit count.
-   - **Feed** — every classified visit, newest first, with verdict badge, title, domain, duration, confidence, AI reason, and a `cache` tag if the verdict came from the in-memory cache instead of a fresh API call.
-3. The date picker lets you scroll back up to 30 days.
-4. **Log out** clears the DOM (shoulder-surf defense) and returns to the password screen.
-
-The dashboard is read-only. It does not edit logs or settings.
+> **Tip:** If you type the wrong password 3 times in a row, the dashboard locks for 1 minute. This is to slow down guessing.
 
 ---
 
-## Where data is stored
+## What it costs
 
-Everything is in `chrome.storage.local`, which is a per-extension key-value store scoped to the local browser profile. Nothing leaves the device except Claude API calls.
+**FocusGuard itself is free.** There's no subscription, no in-app purchase, no account.
 
-| Key                 | Shape                                                       | Written by     |
-| ------------------- | ----------------------------------------------------------- | -------------- |
-| `apiKey`            | string, must start with `sk-ant-`                           | `setup.js`     |
-| `parentPassword`    | `{salt: <hex32>, hash: <sha256(salt + ":" + password)>}`    | `setup.js`     |
-| `log:YYYY-MM-DD`    | array of visit entries (see below)                          | `logger.js`    |
+**The only cost is the AI.** Each time your child opens a web page, FocusGuard sends one short question to the Claude AI ("is this page educational or a distraction?"). Each question costs a tiny fraction of a cent.
 
-Each day is one key. A visit entry looks like:
+In practice, most families spend **under $1 per month.** Heavy users might see a few dollars.
 
-```json
-{
-  "id": "k3h9m2ab1a2b",
-  "ts": 1734567890123,
-  "url": "https://en.wikipedia.org/wiki/Photosynthesis",
-  "title": "Photosynthesis - Wikipedia",
-  "domain": "en.wikipedia.org",
-  "verdict": "allow",
-  "reason": "educational reference",
-  "confidence": 0.95,
-  "source": "api",
-  "durationMs": 182000
-}
-```
+You can:
 
-- **URL / title / reason** are truncated to 500 / 200 / 200 characters respectively.
-- **durationMs** is updated when the tab loses focus (`tabs.onActivated`, `windows.onFocusChanged`). There's a write lock in `logger.js:40` so duration patches don't race with new visits.
-- **source** is one of `api` (fresh Claude call), `cache` (in-memory LRU hit), or `fallback` (internal URL, no API key, API error).
-- **Cap:** 5000 entries per day. If a bug floods logs, the oldest entries in that day are dropped first.
-
-### Browsing history vs. the log
-
-FocusGuard does **not** read Chrome's built-in history database. It writes its own log, containing only pages the user visited while the extension was installed and active.
-
-### Retention
-
-A `chrome.alarms` alarm (`focusguard-prune`) fires every 24 hours and removes any `log:YYYY-MM-DD` key whose date is older than 30 days. A prune also runs on `onInstalled` and `onStartup`. See `logger.js:155` and `background.js:66`.
-
-### Clearing everything
-
-From the service-worker DevTools console (`chrome://extensions` → FocusGuard → "Service Worker"):
-
-```js
-await chrome.storage.local.clear();
-```
-
-Or remove just credentials and keep logs:
-
-```js
-await chrome.storage.local.remove(['apiKey', 'parentPassword']);
-```
+- **Check your balance** anytime at [console.anthropic.com](https://console.anthropic.com/).
+- **Set a monthly spending limit** on the Anthropic billing page so you're never charged above a certain amount.
+- **Top up whenever you want** — if your balance runs out, FocusGuard simply stops blocking and lets everything through (it fails safely; the browser keeps working).
 
 ---
 
-## Privacy & security model
+## Your privacy
 
-This is a parental-control tool. The threat model assumes the parent installs and configures the extension, and the child is the "untrusted" user of the same machine — so several defenses are aimed at the child, not at remote attackers.
+FocusGuard is built around one principle: **your child's browsing stays on your computer.**
 
-### What never leaves the device
+### What stays on the computer
 
-- Activity logs (URLs, titles, durations, verdicts) — **never sent anywhere**. They live only in `chrome.storage.local` on the local profile.
-- The parent password — only its salted SHA-256 hash is stored. The plaintext is never written to disk or sent.
-- Chrome browsing history — FocusGuard doesn't read it.
+- Every website your child visits (URL and page title).
+- How long they spent on each one.
+- Your API key.
+- Your parent password (stored as a scrambled, unreadable version — not the password itself).
 
-### What does leave the device
+None of this is ever sent to FocusGuard, to me, or to anyone else. There's no company server. There's no account. No one can see it except you, and only through the password-protected dashboard on your own computer.
 
-Only the page **URL** and **title** are sent to Anthropic, per classification, as the body of a `messages` API call. Page body text, cookies, form fields, and DOM contents are **not** sent. Anthropic's data usage policy applies to those requests.
+### What's sent to Anthropic (the AI company)
 
-### API key handling
+For each page your child opens, FocusGuard sends the AI **only two things**:
 
-- Stored in `chrome.storage.local` (not in source, not in sync storage).
-- Read on demand by the service worker and cached in memory for the worker's lifetime.
-- Validated on read with a `sk-ant-` prefix check.
-- Invalidated when storage changes (e.g. re-setup).
-- Sent to `api.anthropic.com` as the `x-api-key` header with TLS.
+- The **web address** of the page (e.g. `https://en.wikipedia.org/wiki/Photosynthesis`).
+- The **page title** (e.g. "Photosynthesis - Wikipedia").
 
-### Password handling
+That's it. Nothing else — not the page contents, not cookies, not your API key to anyone other than the AI itself. Anthropic is the company that answers the question; their privacy policy is on [anthropic.com](https://www.anthropic.com/legal/privacy).
 
-- Hash = `sha256(salt + ":" + password)` with a fresh 16-byte random salt per setup.
-- Dashboard verifies by recomputing the hash and comparing in JS (`dashboard.js:78`).
-- 3 failed attempts lock the dashboard for 60 seconds; on logout the DOM is cleared so cached entries don't linger behind the auth screen.
-- ⚠️ **SHA-256 is fast.** A determined attacker with filesystem access could brute-force a weak password offline. Pick a non-trivial password. A future hardening pass would swap SHA-256 for a slow KDF like PBKDF2 or Argon2.
+### What about Chrome's history?
 
-### Overlay isolation
+FocusGuard does **not** read Chrome's built-in history database. It keeps its own separate log of only the pages that happened while it was installed.
 
-The warning overlay is injected as a `<div>` with `all: initial`, a maxed-out `z-index`, and a **closed** Shadow DOM. Page scripts can't reach into the shadow tree, and the content script runs in an isolated world so `window.FocusGuardOverlay` isn't exposed to the page. The HTML inside the overlay is generated with explicit escaping of classifier-returned text (`overlay.js:74`).
+### Uninstalling wipes everything
 
-### Tab-closing authorization
-
-The `CLOSE_TAB` message handler uses `sender.tab.id` — it never trusts a tab id supplied in the message payload, so a compromised page can only close its own tab (`background.js:110`).
-
-### Prompt injection
-
-Page titles are attacker-controlled. Before the title hits the Claude prompt, newlines are stripped and length is capped to 200 characters (`classifier.js:117`). The classifier can't be tricked into changing system instructions by a malicious `<title>`.
-
-### Fail-open philosophy
-
-Every error path — missing API key, API timeout, malformed JSON, classifier not loaded — returns `verdict: "allow"`. The worst-case failure mode is "FocusGuard is broken so the child can browse freely", never "FocusGuard is broken so the browser is unusable".
+If you uninstall FocusGuard, everything it stored — API key, password, and all the activity history — is deleted from the computer immediately.
 
 ---
 
-## File layout
+## Common questions
 
-```
-focusguard/
-├── manifest.json      MV3 manifest. Permissions: tabs, storage, alarms, <all_urls>.
-├── background.js      Service worker. Routes messages, classifies SPA navs,
-│                      tracks focus, runs the daily prune alarm.
-├── classifier.js      Claude Haiku client with in-memory LRU cache.
-├── logger.js          Activity logger. Per-day storage keys, duration tracking,
-│                      write lock, 30-day pruning.
-├── content.js         Injected on every page. Sends PAGE_DATA, triggers overlay.
-├── overlay.js         Shadow-DOM warning UI with 5-second countdown.
-├── setup.html/js/css  First-time setup form (API key + parent password).
-├── dashboard.html/js  Parent dashboard (password gate + activity feed + stats).
-├── base.css           Shared styles for setup/dashboard.
-├── dashboard.css      Dashboard-specific styles.
-└── icons/             16 / 48 / 128 px extension icons.
-docs/
-└── superpowers/specs/2026-04-15-focusguard-design.md   Original design doc.
-```
+### Is FocusGuard always on?
 
----
+**Yes.** Once it's set up, it runs automatically whenever Chrome is open. You don't have to turn it on, leave a tab open, or do anything to keep it running. It works after restarts, too.
 
-## Development notes
+### Do I need to keep the DevTools window open?
 
-- **Pure vanilla JS, no build step.** Edit files in `focusguard/` and hit "Reload" on `chrome://extensions`.
-- Service worker logs are in the extension's dedicated DevTools: `chrome://extensions` → FocusGuard → **Service Worker**. You'll see lines like `[FocusGuard] classify <url> -> block (gaming, 0.93, api)`.
-- Content-script logs (from `content.js` / `overlay.js`) appear in the DevTools console of the page itself.
-- Dashboard / setup pages have their own DevTools — open them from `Ctrl+Shift+I` on the page.
-- Dev helpers:
-  - `await self.FocusGuardLogger._summary()` in the service-worker console — returns per-day entry counts.
-  - `await chrome.storage.local.get(null)` — dump everything.
-- Project context and subagent output from the build phases live in `.claude/PRPs/`.
+**No.** Just install it once and leave it alone. You don't need to open any developer tools.
 
----
+### Does it work on Incognito mode?
 
-## Troubleshooting
+By default, Chrome extensions don't run in Incognito windows — meaning a tech-savvy child could open Incognito and browse freely. To fix this:
 
-**Every page is allowed, nothing is blocked.**
-Check the service-worker console. `[FocusGuard] No API key set — allowing by default` means setup didn't save. Re-run `setup.html`. `API error: 401` means the key is rejected — generate a new one. API errors always fail open.
+1. Go to `chrome://extensions`.
+2. Click **"Details"** under FocusGuard.
+3. Turn on **"Allow in Incognito."**
 
-**The overlay doesn't close the tab.**
-The tab-close path requires an intact messaging channel between `content.js` and the service worker. A reload of the extension mid-page invalidates the context; just navigate once and subsequent pages will work.
+Or, if you'd prefer, you can disable Incognito mode entirely in Chrome's settings.
 
-**I forgot the parent password.**
-There's no recovery flow by design. Open the service-worker DevTools console and run:
+### What happens if Chrome is closed and reopened?
 
-```js
-await chrome.storage.local.remove('parentPassword');
-```
+Everything keeps working. Your API key, password, and history all stick around. The dashboard will show the same info as before. Pages that were blocked yesterday will still be blocked today.
 
-Then reopen `setup.html` and set a new one.
+### Can I use FocusGuard on more than one computer?
 
-**I want to wipe all activity.**
+Yes — install it on each computer separately, each with its own copy of the API key. The activity log on each computer is separate (it's not synced across devices).
 
-```js
-const all = await chrome.storage.local.get(null);
-const keys = Object.keys(all).filter(k => k.startsWith('log:'));
-await chrome.storage.local.remove(keys);
-```
+### Does the AI ever get it wrong?
+
+Sometimes. The AI is trained to lean toward "allow" when it's unsure, so it's more likely to let a borderline page through than to block a real homework page. If something important keeps getting blocked, check the dashboard to see the AI's reason — it can help you understand what happened.
+
+### What if the AI can't be reached (no internet, outage, etc.)?
+
+FocusGuard **lets the page through** in that case. This is on purpose — we never want a bug or a network hiccup to break your child's browser. The worst case is "FocusGuard stopped blocking for a while," not "the browser stopped working."
+
+### Can my child bypass it?
+
+FocusGuard is a **gentle** tool, not a hard lock. A determined child who knows about `chrome://extensions` can turn it off there. For that reason, it works best when combined with:
+
+- **Honest conversations** about focus and homework — some families find that just telling the child "this closes distracting tabs while you're working" actually works fine.
+- **Your operating system's parental controls** (built into Windows and macOS) for stricter limits that kids can't disable in the browser.
+
+### I forgot my password.
+
+There's no way to recover it — but you can reset it. Uninstall FocusGuard (see below), then install it again and pick a new password. You'll lose the past activity history when you do this.
+
+### I want to change my API key or password.
+
+Just re-open the setup page at `chrome-extension://<id>/setup.html` (same way you found the dashboard URL above) and fill it in again. The new values replace the old ones.
 
 ---
 
-## Limitations
+## Uninstalling
 
-- **Chromium only.** Uses MV3 service workers and `chrome.storage.local`. Firefox port would need manifest adjustments.
-- **Not a security sandbox.** A determined child with developer-tools access can disable the extension at `chrome://extensions`. True kiosk-level lockdown requires OS-level parental controls; FocusGuard is designed for cases where a simple, hidden tool is enough.
-- **Depends on Anthropic API availability.** If `api.anthropic.com` is unreachable, the classifier fails open and pages pass through unblocked (by design — see above).
-- **Title-only classification.** The classifier sees the URL and `<title>` but not page body text. That keeps request size and latency low, but some legitimately-titled-but-off-task pages can slip through, and some well-titled educational pages on suspicious domains get blocked. The system prompt is tuned to lean toward allow when uncertain.
-- **In-memory cache only.** Verdicts aren't persisted across service-worker restarts (Chrome aggressively terminates idle MV3 workers), so the same URL may be re-classified if the worker has been evicted. This is a cost/freshness trade-off — re-querying on fresh workers keeps verdicts current.
+1. In Chrome's address bar, type `chrome://extensions` and press Enter.
+2. Find **FocusGuard** in the list.
+3. Click **"Remove."**
+4. Confirm.
+
+Everything — your API key, parent password, and all activity history — is deleted from the computer right away. Nothing is left behind.
+
+---
+
+Questions, problems, or ideas? Open an issue on this project's GitHub page.
