@@ -224,7 +224,7 @@
       const metaParts = [];
       if (e.domain) metaParts.push(escapeHtml(e.domain));
       metaParts.push(`${confStr} conf`);
-      if (e.source === 'cache') metaParts.push('cache');
+      if (e.source === 'cache' || e.source === 'allowlist') metaParts.push(e.source);
       const metaHtml = metaParts
         .map((p) => `<span>${p}</span>`)
         .join('<span class="dot"></span>');
@@ -283,11 +283,115 @@
     renderFeed(entries);
   }
 
+  // --- Allowlist ---
+  // chrome.storage.local.allowlist: string[] — substrings matched against URL.
+  // classifier.js reads it via chrome.storage.onChanged, so writes here take
+  // effect immediately without reloading the service worker.
+
+  const ALLOWLIST_MAX_ENTRIES = 500;
+  const ALLOWLIST_MAX_ENTRY_LEN = 500;
+  let allowlist = [];
+
+  async function loadAllowlist() {
+    try {
+      const { allowlist: stored } = await chrome.storage.local.get('allowlist');
+      allowlist = Array.isArray(stored) ? stored.slice() : [];
+    } catch {
+      allowlist = [];
+    }
+    renderAllowlist();
+  }
+
+  async function saveAllowlist() {
+    try { await chrome.storage.local.set({ allowlist }); } catch {}
+  }
+
+  function renderAllowlist() {
+    const list = $('allowlist-items');
+    const empty = $('allowlist-empty');
+    list.innerHTML = '';
+    if (!allowlist.length) {
+      empty.hidden = false;
+      return;
+    }
+    empty.hidden = true;
+    const frag = document.createDocumentFragment();
+    for (const entry of allowlist) {
+      const row = document.createElement('div');
+      row.className = 'allowlist-row';
+      row.innerHTML = `
+        <span class="allowlist-entry" title="${escapeHtml(entry)}">${escapeHtml(entry)}</span>
+        <button class="allowlist-delete" type="button" aria-label="Remove ${escapeHtml(entry)}">
+          <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </button>
+      `;
+      // Attach the entry to the delete button as a data property — avoids
+      // string-matching on rendered text and survives any future escaping.
+      row.querySelector('.allowlist-delete').dataset.entry = entry;
+      frag.appendChild(row);
+    }
+    list.appendChild(frag);
+  }
+
+  function setAllowlistError(msg) {
+    const el = $('allowlist-error');
+    if (!msg) { el.hidden = true; el.textContent = ''; return; }
+    el.textContent = msg;
+    el.hidden = false;
+  }
+
+  async function addAllowlistEntry(raw) {
+    setAllowlistError('');
+    const trimmed = String(raw || '').trim();
+    if (!trimmed) return;
+    if (trimmed.length > ALLOWLIST_MAX_ENTRY_LEN) {
+      setAllowlistError(`Entry must be ${ALLOWLIST_MAX_ENTRY_LEN} characters or fewer.`);
+      return;
+    }
+    if (allowlist.includes(trimmed)) {
+      setAllowlistError('That entry is already on the list.');
+      return;
+    }
+    if (allowlist.length >= ALLOWLIST_MAX_ENTRIES) {
+      setAllowlistError(`Allowlist is full (${ALLOWLIST_MAX_ENTRIES} max).`);
+      return;
+    }
+    allowlist = [...allowlist, trimmed];
+    await saveAllowlist();
+    renderAllowlist();
+  }
+
+  async function removeAllowlistEntry(entry) {
+    allowlist = allowlist.filter((e) => e !== entry);
+    await saveAllowlist();
+    renderAllowlist();
+  }
+
+  function wireAllowlistControls() {
+    $('allowlist-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const input = $('allowlist-input');
+      await addAllowlistEntry(input.value);
+      if (!$('allowlist-error').hidden) return;
+      input.value = '';
+      input.focus();
+    });
+    $('allowlist-input').addEventListener('input', () => setAllowlistError(''));
+    $('allowlist-items').addEventListener('click', async (e) => {
+      const btn = e.target.closest('.allowlist-delete');
+      if (!btn) return;
+      await removeAllowlistEntry(btn.dataset.entry);
+    });
+  }
+
   // --- Main view + logout ---
 
   function initMainView() {
     populateDatePicker();
     renderDay();
+    loadAllowlist();
   }
 
   function wireMainControls() {
@@ -297,6 +401,7 @@
       state.selectedDate = $('date-picker').value;
       renderDay();
     });
+    wireAllowlistControls();
   }
 
   function logout() {
@@ -307,6 +412,9 @@
     $('stat-educational').textContent = '—';
     $('stat-blocked').textContent = '—';
     $('stat-top-domains').innerHTML = '';
+    $('allowlist-items').innerHTML = '';
+    $('allowlist-input').value = '';
+    setAllowlistError('');
     $('auth-password').value = '';
     $('auth-error').hidden = true;
     showView('auth');

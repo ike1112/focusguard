@@ -77,18 +77,50 @@ async function getApiKey() {
   return null;
 }
 
-// Invalidate when storage changes (Phase 6 setup flow updates it).
-// Re-validate the `sk-ant-` prefix here — don't trust whatever got written.
+// --- Allowlist (parent-managed URL bypass list) ---
+// Entries are substrings matched against the URL. An allowlist hit returns
+// `allow` immediately, skipping both the verdict cache and the API call.
+
+let cachedAllowlist = null;
+
+async function getAllowlist() {
+  if (Array.isArray(cachedAllowlist)) return cachedAllowlist;
+  try {
+    const { allowlist } = await chrome.storage.local.get('allowlist');
+    cachedAllowlist = Array.isArray(allowlist)
+      ? allowlist.filter((e) => typeof e === 'string' && e.length > 0)
+      : [];
+  } catch {
+    cachedAllowlist = [];
+  }
+  return cachedAllowlist;
+}
+
+function matchAllowlist(url, list) {
+  for (const entry of list) {
+    if (entry && url.includes(entry)) return entry;
+  }
+  return null;
+}
+
+// Invalidate when storage changes.
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local' && changes.apiKey) {
+  if (area !== 'local') return;
+  if (changes.apiKey) {
     const next = changes.apiKey.newValue;
     cachedApiKey = (typeof next === 'string' && next.startsWith('sk-ant-')) ? next : null;
+  }
+  if (changes.allowlist) {
+    const next = changes.allowlist.newValue;
+    cachedAllowlist = Array.isArray(next)
+      ? next.filter((e) => typeof e === 'string' && e.length > 0)
+      : [];
   }
 });
 
 // --- System prompt (tuned for moderate filtering per PRD) ---
 
-const SYSTEM_PROMPT = `You are FocusGuard, a classifier that decides whether a web page is appropriate for an 11-year-old doing homework.
+const SYSTEM_PROMPT = `You are FocusGuard, a classifier that decides whether a web page is appropriate for a student focused on homework.
 
 You will receive a URL and the page title. Classify as one of:
 - "allow" — homework, education, reference, research, general knowledge, news, school tools (Google Classroom, Docs, Drive, Khan Academy, etc.)
@@ -187,6 +219,19 @@ async function classifyPage({ url, title }) {
       url.startsWith('about:') ||
       url.startsWith('file://')) {
     return { verdict: 'allow', reason: 'internal', confidence: 1, source: 'fallback' };
+  }
+
+  // Parent allowlist wins over both cache and API — removing an entry
+  // means subsequent visits fall through to normal classification.
+  const allowlist = await getAllowlist();
+  const matched = matchAllowlist(url, allowlist);
+  if (matched) {
+    return {
+      verdict: 'allow',
+      reason: `allowlisted: ${matched}`,
+      confidence: 1,
+      source: 'allowlist',
+    };
   }
 
   const cached = cacheGet(url);

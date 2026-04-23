@@ -127,6 +127,31 @@
           <div class="empty-sub">Entries appear here once your child browses the web.</div>
         </div>
       </section>
+
+      <section class="panel allowlist-panel">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">Allowed URLs</h2>
+            <p class="panel-sub">Matches skip classification and always pass. Substring match on the URL.</p>
+          </div>
+        </div>
+        <form id="allowlist-form" class="allowlist-form" autocomplete="off">
+          <label for="allowlist-input" class="sr-only">URL or domain to allow</label>
+          <input id="allowlist-input" type="text" spellcheck="false"
+                 placeholder="e.g. developer.mozilla.org or youtube.com/watch?v=ABC" maxlength="500">
+          <button type="submit" class="btn-primary">
+            <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <span>Add</span>
+          </button>
+        </form>
+        <p id="allowlist-error" class="allowlist-error" hidden></p>
+        <div class="allowlist-items" id="allowlist-items"></div>
+        <div class="allowlist-empty" id="allowlist-empty" hidden>
+          No allowed URLs yet. Add one above to skip classification for that page or domain.
+        </div>
+      </section>
     </main>
   </section>
 
