@@ -49,11 +49,23 @@
 
   // --- Initial full-load classification ---
 
+  // Best-effort visible-text excerpt. innerText respects display:none and
+  // skips <script>/<style>, giving "what the user actually sees". Capped
+  // here so we don't ship megabytes of forum content to the API; the
+  // classifier sanitizes again before sending.
+  let bodyText = '';
+  try {
+    bodyText = (document.body && document.body.innerText || '').slice(0, 4000);
+  } catch (_) {
+    // Some pages throw on innerText access; fall through with empty string.
+  }
+
   chrome.runtime.sendMessage(
     {
       type: 'PAGE_DATA',
       url: window.location.href,
       title: document.title || '',
+      bodyText,
     },
     (response) => {
       if (chrome.runtime.lastError) {

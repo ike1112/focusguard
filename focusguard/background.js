@@ -85,10 +85,12 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message && message.type === 'PAGE_DATA' && typeof message.url === 'string') {
     const title = typeof message.title === 'string' ? message.title : '';
+    const bodyText = typeof message.bodyText === 'string' ? message.bodyText : '';
     const tabId = sender && sender.tab && sender.tab.id;
     self.FocusGuardClassifier.classifyPage({
       url: message.url,
       title,
+      bodyText,
     }).then((verdict) => {
       console.log('[FocusGuard] classify', message.url, '->',
         verdict.verdict, `(${verdict.reason}, ${verdict.confidence.toFixed(2)}, ${verdict.source})`);
@@ -131,10 +133,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   // Fire whenever the tab's URL changes. This catches SPA navigations
   // (YouTube search, Reddit subreddit clicks, etc.) that content.js misses
-  // because it only runs once at document_idle. Full-load URL commits also
-  // hit this listener — the classifier's cache dedupes them against any
-  // PAGE_DATA classification that content.js triggers later.
+  // because it only runs once at document_idle.
+  //
+  // Skip full page loads: those emit changeInfo with status='loading' when
+  // the URL commits. content.js will fire PAGE_DATA shortly after with the
+  // page body excerpt — letting the SPA path classify here would race and
+  // poison the per-URL cache with a title-only verdict before the
+  // body-aware classification ever runs.
   if (!changeInfo.url) return;
+  if (changeInfo.status) return;
 
   const url = changeInfo.url;
   if (url.startsWith('chrome://') ||
