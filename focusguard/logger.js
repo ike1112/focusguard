@@ -102,6 +102,19 @@ async function logPageVisit({ url, title, verdict, reason, confidence, source, t
       await chrome.storage.local.set({ [key]: arr });
     });
     if (typeof tabId === 'number') {
+      // If this tab was already accruing focus time on a prior log entry
+      // (SPA nav, or a full-page load within a focused tab), flush that
+      // elapsed time to the prior entry before moving the per-tab pointer
+      // to the new entry. Without this, the time spent on the previous
+      // URL gets silently re-attributed to the new one when the user
+      // eventually switches tabs.
+      //
+      // Order matters: flushAndRestart() reads lastEntryIdByTab BEFORE we
+      // update the pointer, so it patches the OLD entry. We do this after
+      // the append succeeds so a storage-write failure can't burn the
+      // accrued duration without producing the new entry that justifies
+      // the boundary.
+      if (tabId === activeTabId) flushAndRestart();
       lastEntryIdByTab.set(tabId, { key, id: entry.id });
     }
   } catch (e) {
@@ -132,15 +145,34 @@ function flushActive() {
   const ref = lastEntryIdByTab.get(activeTabId);
   activeTabId = null;
   activeSince = null;
-  if (!ref || elapsed <= 0) return;
+  if (ref && elapsed > 0) patchEntryDuration(ref, elapsed);
+}
 
+// Flush accrued focus time onto the active tab's CURRENT last entry,
+// then restart the timer — without deactivating the tab. Used when a
+// new log entry is about to replace the per-tab pointer (URL change
+// inside a focused tab) so the elapsed time lands on the URL the user
+// was actually viewing, not the one they're navigating to.
+function flushAndRestart() {
+  if (activeTabId == null || activeSince == null) return;
+  const now = Date.now();
+  const elapsed = now - activeSince;
+  const ref = lastEntryIdByTab.get(activeTabId);
+  activeSince = now;
+  if (ref && elapsed > 0) patchEntryDuration(ref, elapsed);
+}
+
+// Fire-and-forget patch under the storage write lock. Caller has already
+// captured `ref` and `elapsedMs` against module state, so it's safe to
+// not await — the lock chain serializes against any concurrent writes.
+function patchEntryDuration(ref, elapsedMs) {
   withLock(async () => {
     const got = await chrome.storage.local.get(ref.key);
     const arr = got[ref.key];
     if (!Array.isArray(arr)) return;
     const idx = arr.findIndex((e) => e.id === ref.id);
     if (idx === -1) return;
-    arr[idx].durationMs = (arr[idx].durationMs || 0) + elapsed;
+    arr[idx].durationMs = (arr[idx].durationMs || 0) + elapsedMs;
     await chrome.storage.local.set({ [ref.key]: arr });
   }).catch((e) => console.warn('[FocusGuard] duration patch failed:', e));
 }
