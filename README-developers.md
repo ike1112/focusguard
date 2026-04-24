@@ -84,6 +84,66 @@ If the classifier module fails to load, if the API key is missing, if the reques
 
 Page titles feed into the Claude prompt. Since a page can set `document.title` to anything, the classifier strips newlines and caps length before sending (`classifier.js:117`), and the overlay HTML-escapes any classifier-returned `reason` string before rendering (`overlay.js:74`).
 
+### Duration tracking
+
+The dashboard's "Time online" stat and per-domain rankings depend on accurate per-page duration. This is harder than it looks because URLs change *inside* a focused tab (SPA navigation, full-page reloads), and the per-tab pointer that duration patches use must move at exactly the right moment.
+
+#### The model
+
+`logger.js` keeps three pieces of in-memory state in the service worker:
+
+- `activeTabId` — which tab is focused right now (`null` when no Chrome window has focus)
+- `activeSince` — ms timestamp when that tab became focused
+- `lastEntryIdByTab` — map from `tabId` to `{key, id}` pointing at the tab's most recent log entry
+
+Whenever something happens that ends a "viewing session", the elapsed time `now - activeSince` is added to whichever entry the active tab's pointer was pointing at *before* the change.
+
+#### When the timer flushes
+
+| Trigger | What runs | Where the elapsed time lands |
+|---------|-----------|------------------------------|
+| User switches to a different tab | `tabs.onActivated` → `markTabActive` → `flushActive` | The previously-focused tab's last entry |
+| Chrome window loses focus, or another window gains it | `windows.onFocusChanged` → flush or re-mark | Same |
+| URL changes within the focused tab (SPA nav, full-page reload) | `logPageVisit` → `flushAndRestart` | The previous entry for that tab; timer immediately restarts on the new entry |
+| Tab closes | `tabs.onRemoved` → `forgetTab` → `flushActive` if it was the active tab | The closed tab's last entry |
+
+All four paths route their storage write through the same `withLock` chain (`logger.js:40`), so a duration patch can never race with a concurrent log append.
+
+The SPA / full-page-reload case (third row) is the one most users won't expect to "just work" — it's the difference between `youtube.com/` showing 0s vs. its real dwell time when the kid clicks through to a video. `flushAndRestart` runs *after* the new log entry has been successfully appended but *before* `lastEntryIdByTab` flips to point at it: this keeps a storage-write failure from burning the prior duration without producing the entry that justifies the boundary.
+
+#### Manual test cases
+
+There is no automated test suite — duration tracking depends on real Chrome focus events, real service-worker timing, and real `chrome.storage.local`. Verify by hand. Reload the unpacked extension before each scenario so the worker starts clean, and keep the parent dashboard open in a side window to inspect entries.
+
+1. **Single-page focus (baseline).**
+   Open one tab on `https://en.wikipedia.org/wiki/Photosynthesis`. Wait 30s. Switch to another tab. The Wikipedia entry should show ~30s.
+
+2. **SPA navigation within a focused tab.**
+   Focus a tab on `https://www.youtube.com/`. Wait 30s. Click any video. Wait 60s. Switch tabs. Two entries: `youtube.com/` ≈ 30s, watch URL ≈ 60s. *Without the SPA flush, `youtube.com/` would be 0s and the watch URL would be ≈ 90s.*
+
+3. **Full-page reload within a focused tab.**
+   Focus a Wikipedia article. Wait 20s. Hit `Ctrl+R`. Wait 30s. Switch tabs. Two separate entries for the same URL: ~20s and ~30s. (Reloads are intentionally counted as separate sessions — useful for spotting refresh-spam.)
+
+4. **Background tab opened with `Ctrl+click`.**
+   Focus tab A, wait 20s. `Ctrl+click` a link to open tab B in the background. Continue reading tab A for 20s. Switch to tab B for 30s. Switch back to tab A. Tab A's entry shows ~40s; tab B's entry shows ~30s. Tab B never accrues time while it's in the background.
+
+5. **Tab closed without switching first.**
+   Focus a tab. Wait 30s. Hit `Ctrl+W`. The closed tab's entry should show ~30s — `tabs.onRemoved` flushes the timer.
+
+6. **Chrome unfocused (alt-tab to another app).**
+   Focus a tab. Wait 20s. Click out to another application so Chrome loses window focus. Wait 30s. Click back to Chrome. The entry shows ~20s, not ~50s — the time spent looking at another app is correctly excluded.
+
+7. **Two windows, one Chrome.**
+   Open two Chrome windows, one tab each. Focus window 1 for 20s, switch to window 2 for 30s. The window-1 entry should show ~20s and the window-2 entry ~30s. (`windows.onFocusChanged` handles the cross-window switch.)
+
+#### Known limitations (intentionally not fixed yet)
+
+The current model is correct *while the service worker is alive and Chrome's focus events fire*. It misses three cases:
+
+- **Service-worker eviction.** Chrome MV3 evicts idle service workers (~30s of inactivity). `activeTabId` and `activeSince` are wiped — they're plain JS state, not persisted. A long, single-tab read with no other events will accrue 0 duration. *Fix candidate:* mirror `{activeTabId, activeSince}` to `chrome.storage.session` and restore on worker startup.
+- **No initial active-mark on browser/extension start.** `activeTabId` is `null` until the first `tabs.onActivated` or `windows.onFocusChanged`. The first session in a freshly-opened browser doesn't accrue time until the user switches tabs. *Fix candidate:* query `chrome.tabs.query({active: true, lastFocusedWindow: true})` on `runtime.onStartup`.
+- **System sleep / lock screen.** Chrome's window-focus events don't reliably fire on OS sleep or screen lock, so `activeSince` keeps running across "kid walked away." *Fix candidate:* subscribe to `chrome.idle.onStateChanged` and flush on `idle`/`locked`.
+
 ---
 
 ## Install & first-time setup
@@ -173,7 +233,7 @@ Each day is one key. A visit entry looks like:
 ```
 
 - **URL / title / reason** are truncated to 500 / 200 / 200 characters respectively.
-- **durationMs** is updated when the tab loses focus (`tabs.onActivated`, `windows.onFocusChanged`). There's a write lock in `logger.js:40` so duration patches don't race with new visits.
+- **durationMs** is updated whenever the focused tab's URL changes (SPA nav or full-page reload), focus moves to another tab/window, or the tab closes. See [Duration tracking](#duration-tracking) for the full model, manual test cases, and known limitations. A write lock (`logger.js:40`) keeps duration patches from racing with concurrent log appends.
 - **source** is one of `api` (fresh Claude call), `cache` (in-memory LRU hit), or `fallback` (internal URL, no API key, API error).
 - **Cap:** 5000 entries per day. If a bug floods logs, the oldest entries in that day are dropped first.
 
