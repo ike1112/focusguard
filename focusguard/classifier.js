@@ -79,6 +79,27 @@ function persistCache() {
   );
 }
 
+// Tracking/session params that appear in URLs but don't change page content.
+// Stripping them lets YouTube, Reddit, etc. share a cache entry regardless
+// of how the link was shared. The raw URL is still sent to the API and logged.
+const STRIP_PARAMS = new Set([
+  'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'utm_id',
+  'fbclid', 'gclid', 'msclkid', 'twclid', 'li_fat_id', 'yclid', 'igshid',
+  'si', 'feature', 'pp', 'ref', 'ref_src', 'ref_url', '_ga',
+]);
+
+function normalizeForCache(url) {
+  try {
+    const u = new URL(url);
+    for (const key of [...u.searchParams.keys()]) {
+      if (STRIP_PARAMS.has(key)) u.searchParams.delete(key);
+    }
+    return u.toString();
+  } catch {
+    return url;  // unparseable — use raw
+  }
+}
+
 // --- Dev seeding (Phase 2, before Phase 6 setup UI exists) ---
 // To test locally, paste into the service worker DevTools console:
 //
@@ -271,7 +292,7 @@ async function classifyPage({ url, title, bodyText }) {
     };
   }
 
-  const cached = cacheGet(url);
+  const cached = cacheGet(normalizeForCache(url));
   if (cached) {
     return { ...cached, source: 'cache' };
   }
@@ -291,7 +312,7 @@ async function classifyPage({ url, title, bodyText }) {
     return { verdict: 'allow', reason: 'api-error', confidence: 1, source: 'fallback' };
   }
 
-  cachePut(url, parsed);
+  cachePut(normalizeForCache(url), parsed);
   persistCache();
   return { ...parsed, source: 'api' };
 }
