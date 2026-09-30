@@ -1,0 +1,12 @@
+{
+  "name": "focusguard-benchmark",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "scrape": "node scrape.js",
+    "serve": "node server.js"
+  },
+  "dependencies": {
+    "puppeteer": "^23.0.0"
+  }
+}

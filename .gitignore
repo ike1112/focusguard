@@ -1,8 +1,12 @@
 # Claude Code — per-machine and AI planning files (not project source)
 .claude/
 
-# Benchmark secrets
+# Benchmark secrets and generated files
 benchmark/.env
+benchmark/node_modules/
+# dataset.json contains real scraped page content — commit it intentionally
+# after running scrape.js and reviewing the output
+benchmark/dataset.json
 
 # OS / editor noise
 .DS_Store

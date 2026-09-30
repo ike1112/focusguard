@@ -136,6 +136,19 @@ createServer(async (req, res) => {
     return;
   }
 
+  // Serve scraped dataset if available
+  if (req.method === 'GET' && url.pathname === '/api/dataset') {
+    const datasetPath = resolve(__dirname, 'dataset.json');
+    if (existsSync(datasetPath)) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(readFileSync(datasetPath, 'utf8'));
+    } else {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'dataset.json not found — run: npm run scrape' }));
+    }
+    return;
+  }
+
   // Status
   if (req.method === 'GET' && url.pathname === '/api/status') {
     const data = await handleStatus();
