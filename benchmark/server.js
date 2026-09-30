@@ -1,0 +1,168 @@
+#!/usr/bin/env node
+// benchmark/server.js — zero npm deps, Node 18+
+// Usage: node benchmark/server.js
+//        (run from repo root or from benchmark/ directory)
+
+import { createServer } from 'node:http';
+import { readFileSync, existsSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const PORT = 3474;
+
+// ─── Load .env ────────────────────────────────────────────────────────────────
+function loadEnv() {
+  const envPath = resolve(__dirname, '.env');
+  if (!existsSync(envPath)) {
+    console.warn('[warn] benchmark/.env not found — copy .env.example and fill in keys');
+    return;
+  }
+  for (const line of readFileSync(envPath, 'utf8').split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq < 0) continue;
+    const key = trimmed.slice(0, eq).trim();
+    const val = trimmed.slice(eq + 1).trim();
+    if (key && val && !process.env[key]) process.env[key] = val;
+  }
+}
+loadEnv();
+
+const ANTHROPIC_KEY  = process.env.ANTHROPIC_API_KEY  || '';
+const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY || '';
+const TYPESAFE_KEY   = process.env.TYPESAFE_API_KEY   || '';
+
+const CLAUDE_VIA = ANTHROPIC_KEY  ? 'anthropic'
+                 : OPENROUTER_KEY ? 'openrouter'
+                 : '';
+
+console.log('[bench] Claude via :', CLAUDE_VIA  || '⚠ no key');
+console.log('[bench] Typesafe   :', TYPESAFE_KEY ? '✓' : '⚠ no key');
+console.log(`[bench] Open http://localhost:${PORT}\n`);
+
+// ─── Proxy helpers ────────────────────────────────────────────────────────────
+async function proxyJson(targetUrl, init) {
+  const res = await fetch(targetUrl, init);
+  const body = await res.json().catch(() => ({ error: 'non-json response' }));
+  return { status: res.status, body };
+}
+
+// ─── Route handlers ───────────────────────────────────────────────────────────
+async function handleStatus() {
+  return {
+    claude:   CLAUDE_VIA || null,
+    typesafe: !!TYPESAFE_KEY,
+  };
+}
+
+async function handleClaude(reqBody) {
+  if (!CLAUDE_VIA) return { status: 503, body: { error: 'No Claude key configured in .env' } };
+
+  if (CLAUDE_VIA === 'anthropic') {
+    return proxyJson('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type':    'application/json',
+        'x-api-key':       ANTHROPIC_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify(reqBody),
+    });
+  }
+
+  // OpenRouter — translate to OpenAI chat format
+  const sys = reqBody.system || '';
+  const userMsg = reqBody.messages?.[0]?.content || '';
+  return proxyJson('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'Authorization': `Bearer ${OPENROUTER_KEY}`,
+      'HTTP-Referer':  'http://localhost:' + PORT,
+    },
+    body: JSON.stringify({
+      model:      'anthropic/claude-haiku-4-5',
+      max_tokens: reqBody.max_tokens || 150,
+      messages: [
+        { role: 'system', content: sys },
+        { role: 'user',   content: userMsg },
+      ],
+    }),
+  }).then(({ status, body }) => {
+    // Normalise OpenRouter response to Anthropic shape so the client doesn't care
+    if (status === 200 && body.choices) {
+      const text  = body.choices[0]?.message?.content || '';
+      const usage = body.usage || {};
+      return {
+        status: 200,
+        body: {
+          content: [{ text }],
+          usage: { input_tokens: usage.prompt_tokens || 0, output_tokens: usage.completion_tokens || 0 },
+        },
+      };
+    }
+    return { status, body };
+  });
+}
+
+async function handleTypesafe(reqBody) {
+  if (!TYPESAFE_KEY) return { status: 503, body: { error: 'No Typesafe key configured in .env' } };
+  return proxyJson('https://api.typesafe.ai/v1/systemone', {
+    method: 'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'Authorization': `Bearer ${TYPESAFE_KEY}`,
+    },
+    body: JSON.stringify(reqBody),
+  });
+}
+
+// ─── HTTP server ──────────────────────────────────────────────────────────────
+createServer(async (req, res) => {
+  const url = new URL(req.url, `http://localhost:${PORT}`);
+
+  // CORS for local dev
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+
+  // Serve index.html
+  if (req.method === 'GET' && url.pathname === '/') {
+    const html = readFileSync(resolve(__dirname, 'index.html'), 'utf8');
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(html);
+    return;
+  }
+
+  // Status
+  if (req.method === 'GET' && url.pathname === '/api/status') {
+    const data = await handleStatus();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+    return;
+  }
+
+  // API proxy — read body
+  if (req.method === 'POST' && ['/api/claude', '/api/typesafe'].includes(url.pathname)) {
+    let raw = '';
+    for await (const chunk of req) raw += chunk;
+    let reqBody;
+    try { reqBody = JSON.parse(raw); } catch {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'invalid json' }));
+      return;
+    }
+
+    const { status, body } = url.pathname === '/api/claude'
+      ? await handleClaude(reqBody)
+      : await handleTypesafe(reqBody);
+
+    res.writeHead(status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(body));
+    return;
+  }
+
+  res.writeHead(404); res.end();
+}).listen(PORT);

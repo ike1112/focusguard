@@ -1,6 +1,9 @@
 # Claude Code — per-machine and AI planning files (not project source)
 .claude/
 
+# Benchmark secrets
+benchmark/.env
+
 # OS / editor noise
 .DS_Store
 Thumbs.db

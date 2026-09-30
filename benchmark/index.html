@@ -294,6 +294,17 @@
     }
     .chip-claude { background: #fef3c7; color: #92400e; }
     .chip-typesafe { background: var(--purple-light); color: #5b21b6; }
+
+    .key-status {
+      font-size: 11px;
+      margin-bottom: 6px;
+      padding: 4px 8px;
+      border-radius: var(--radius);
+      background: var(--bg);
+      color: var(--text-muted);
+    }
+    .key-status.ok  { background: var(--green-light); color: #15803d; }
+    .key-status.err { background: #fef2f2; color: var(--red); }
   </style>
 </head>
 <body>
@@ -324,8 +335,8 @@
     <!-- Claude section -->
     <div class="sidebar-section">
       <div class="sidebar-label" style="color:#92400e;">Claude Haiku</div>
-      <input id="claude-key" class="key-input" type="password" placeholder="sk-ant-api03-...">
-      <button id="btn-claude" class="btn-run btn-claude" onclick="runClaude()">
+      <div id="claude-key-status" class="key-status">checking…</div>
+      <button id="btn-claude" class="btn-run btn-claude" onclick="runClaude()" disabled>
         ▶ Run Claude
       </button>
       <div id="claude-progress" style="display:none">
@@ -339,8 +350,8 @@
     <!-- Typesafe section -->
     <div class="sidebar-section">
       <div class="sidebar-label" style="color:#5b21b6;">Typesafe (Jev)</div>
-      <input id="typesafe-key" class="key-input" type="password" placeholder="ts-...">
-      <button id="btn-typesafe" class="btn-run btn-typesafe" onclick="runTypesafe()">
+      <div id="typesafe-key-status" class="key-status">checking…</div>
+      <button id="btn-typesafe" class="btn-run btn-typesafe" onclick="runTypesafe()" disabled>
         ▶ Run Typesafe
       </button>
       <div id="typesafe-progress" style="display:none">
@@ -538,13 +549,38 @@ Policy:
 Respond ONLY with minified JSON:
 {"verdict":"allow","reason":"<short>","confidence":<0..1>}`;
 
+// ─── Status check on load ─────────────────────────────────────────────────────
+async function loadStatus() {
+  try {
+    const res = await fetch('/api/status');
+    const { claude, typesafe } = await res.json();
+
+    const cs = el('claude-key-status');
+    if (claude) {
+      cs.textContent = `✓ via ${claude}`;
+      cs.className = 'key-status ok';
+      el('btn-claude').disabled = false;
+    } else {
+      cs.textContent = '✗ no key in .env';
+      cs.className = 'key-status err';
+    }
+
+    const ts = el('typesafe-key-status');
+    if (typesafe) {
+      ts.textContent = '✓ key loaded';
+      ts.className = 'key-status ok';
+      el('btn-typesafe').disabled = false;
+    } else {
+      ts.textContent = '✗ no key in .env';
+      ts.className = 'key-status err';
+    }
+  } catch {
+    showError('Cannot reach server. Run: node benchmark/server.js');
+  }
+}
+
 // ─── Run Claude ───────────────────────────────────────────────────────────────
 async function runClaude() {
-  const apiKey = document.getElementById('claude-key').value.trim();
-  if (!apiKey || !apiKey.startsWith('sk-ant-')) {
-    showError('Enter a valid Anthropic API key (starts with sk-ant-)');
-    return;
-  }
   clearError();
   setRunning('claude', true);
   setProgress('claude', 0, DATASET.length);
@@ -553,14 +589,9 @@ async function runClaude() {
     const item = DATASET[i];
     const t0 = Date.now();
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await fetch('/api/claude', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
           max_tokens: 150,
@@ -613,11 +644,6 @@ function parseClaudeVerdict(text) {
 
 // ─── Run Typesafe ─────────────────────────────────────────────────────────────
 async function runTypesafe() {
-  const apiKey = document.getElementById('typesafe-key').value.trim();
-  if (!apiKey) {
-    showError('Enter a Typesafe API key');
-    return;
-  }
   clearError();
   setRunning('typesafe', true);
   setProgress('typesafe', 0, DATASET.length);
@@ -627,12 +653,9 @@ async function runTypesafe() {
     const state = `URL: ${item.url}\nTitle: ${item.title}\nExcerpt: ${item.excerpt}`;
     const t0 = Date.now();
     try {
-      const res = await fetch('https://api.typesafe.ai/v1/systemone', {
+      const res = await fetch('/api/typesafe', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: 'jev-latest',
           state,
@@ -916,8 +939,9 @@ function switchTab(name) {
   });
 }
 
-// Init table rows
+// Init table rows and check server status
 renderUrlsTable();
+loadStatus();
 </script>
 </body>
 </html>
