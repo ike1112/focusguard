@@ -1,17 +1,19 @@
 # FocusGuard
 
-**A quiet helper that keeps kids focused on homework.**
+**A quiet AI-powered helper that keeps kids focused on homework.**
 
-When your child opens a website, FocusGuard looks at the page and decides if it's schoolwork or a distraction. Homework stuff (Google Classroom, Wikipedia, Khan Academy, a math site…) passes through like normal — your child won't even know FocusGuard is there. But if they open Roblox, a gaming YouTube video, TikTok, or something else off-task, a full-screen message appears saying **"This doesn't look like homework,"** a 5-second timer counts down, and the tab closes by itself.
+When your child opens a website, FocusGuard reads the page and decides if it's schoolwork or a distraction. Homework stuff (Google Classroom, Wikipedia, Khan Academy, a math site…) passes through like normal — your child won't even know FocusGuard is there. But if they open Roblox, a gaming YouTube video, TikTok, or something else off-task, a full-screen message appears saying **"This doesn't look like homework,"** a 5-second timer counts down, and the tab closes by itself.
 
 You install it once on your child's computer, take two minutes to set it up, and from then on it runs in the background. No icons, no popups, no buttons — nothing for your child to see or turn off.
 
-- 🔒 **Private by design.** Nothing about your child's browsing goes to a company, a website, or an account. It all stays on the one computer.
-- 👨‍👩‍👧 **Only you can see the activity.** There's a hidden page where you type a password to see every site your child has opened today (and up to the last 30 days).
-- 🌱 **Gentle, not scary.** No alarms or lectures. Just a calm "please get back to homework" screen.
-- 💰 **Almost free.** FocusGuard itself costs nothing. The AI that checks the pages usually costs a few cents a month — you top up a small balance and that's it.
+- 🔒 **Private by design.** Your child's browsing stays on your computer. No company server, no account, no cloud storage.
+- 👨‍👩‍👧 **Only you can see the activity.** A hidden password-protected page shows every site your child has opened today and for the past 30 days.
+- 🌱 **Gentle, not scary.** No alarms or lectures — just a calm "please get back to homework" screen.
+- 💰 **Almost free.** FocusGuard itself costs nothing. The AI that checks the pages usually costs a few cents a month.
 
-> Developers: see [README-developers.md](README-developers.md) for architecture, file layout, and API details.
+> **Developers:** see [README-developers.md](README-developers.md) for architecture, security model, file layout, and API details.
+>
+> **Tech:** Chrome Extension (Manifest V3) · Claude Haiku API · Vanilla JS · No backend · `chrome.storage.local`
 
 ---
 
@@ -190,12 +192,13 @@ None of this is ever sent to FocusGuard, to me, or to anyone else. There's no co
 
 ### What's sent to Anthropic (the AI company)
 
-For each page your child opens, FocusGuard sends the AI **only two things**:
+For each page your child opens, FocusGuard sends the AI three things:
 
 - The **web address** of the page (e.g. `https://en.wikipedia.org/wiki/Photosynthesis`).
 - The **page title** (e.g. "Photosynthesis - Wikipedia").
+- A **short excerpt of the page's visible text** — up to 2,000 characters of what your child can actually read on screen (this is how FocusGuard can tell the difference between an educational YouTube video and a gaming one, where the URL alone wouldn't help).
 
-That's it. Nothing else — not the page contents, not cookies, not your API key to anyone other than the AI itself. Anthropic is the company that answers the question; their privacy policy is on [anthropic.com](https://www.anthropic.com/legal/privacy).
+That's it. No cookies, no form fields, no full page contents, no browsing history. Anthropic is the company that answers the question; their privacy policy is at [anthropic.com](https://www.anthropic.com/legal/privacy).
 
 ### What about Chrome's history?
 
@@ -265,7 +268,7 @@ There's no way to recover it — but you can reset it. Uninstall FocusGuard (see
 
 ### I want to change my API key or password.
 
-Just re-open the setup page at `chrome-extension://<id>/setup.html` (same way you found the dashboard URL above) and fill it in again. The new values replace the old ones.
+Open the dashboard, log in, and scroll down to the **Settings** panel at the bottom of the page. You can update your API key (it gets validated against Anthropic before saving) or change your password (requires your current password). No need to go back to the setup page.
 
 ---
 

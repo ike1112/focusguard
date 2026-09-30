@@ -4,9 +4,12 @@ Technical documentation for FocusGuard. Parents looking for install and setup in
 
 FocusGuard is an MV3 Chrome extension that classifies every page visit via the Claude Haiku API, shows a 5-second warning overlay on distractions, and then closes the tab. All state lives in `chrome.storage.local`; there is no server.
 
-- **100 % local** — no server, no database, no telemetry. Everything lives inside the Chrome extension and `chrome.storage.local`.
-- **Direct Claude API calls** — the extension talks to `api.anthropic.com` straight from the service worker; there is nothing in between.
-- **Password-gated parent dashboard** — only the parent can read the activity log.
+- **100% local** — no server, no database, no telemetry. Everything lives inside the Chrome extension and `chrome.storage.local`.
+- **Direct Claude API calls** — the service worker calls `api.anthropic.com` directly (BYOK — parent supplies the API key); nothing goes through a middleman.
+- **Content-aware classification** — each page sends URL, title, and a 2,000-char visible-text excerpt; the classifier uses the excerpt to distinguish an educational YouTube video from a gaming one.
+- **Persistent LRU verdict cache** — 500-entry cache survives MV3 service-worker restarts via `chrome.storage.local`, so the same URL is only ever billed once.
+- **SPA-aware** — `chrome.tabs.onUpdated` re-classifies pushState navigations (YouTube, Reddit, Twitter) that `content.js` never sees because the page doesn't reload.
+- **Password-gated parent dashboard** — salted SHA-256 password, persistent lockout after repeated failures, shoulder-surf-safe logout.
 
 ---
 
@@ -64,9 +67,9 @@ FocusGuard is an MV3 Chrome extension that classifies every page visit via the C
 
 1. A page loads. `content.js` (injected on every URL at `document_idle`) sends `{type: "PAGE_DATA", url, title}` to the service worker.
 2. `background.js` hands the URL/title to `classifier.js`, which:
-   - Returns a cached verdict if the URL has been seen this worker lifetime (in-memory LRU, 500 entries).
-   - Otherwise calls `POST https://api.anthropic.com/v1/messages` with model `claude-haiku-4-5`, a system prompt tuned for moderate filtering, and a 15 s timeout.
-   - Parses the JSON response (`{verdict, reason, confidence}`) and caches it.
+   - Returns a cached verdict if available. On the first call after a worker restart, `hydrateCache()` restores up to 500 entries from `chrome.storage.local`. New verdicts are written back via `persistCache()` (fire-and-forget).
+   - Otherwise calls `POST https://api.anthropic.com/v1/messages` with model `claude-haiku-4-5-20251001`, a system prompt tuned for moderate filtering, and a 15 s timeout.
+   - Parses the JSON response (`{verdict, reason, confidence}`) and caches it (also persisted to `chrome.storage.local` so it survives service-worker eviction).
 3. The verdict is sent back to the content script:
    - `allow` → nothing happens; the page is invisible to the user.
    - `block` → `overlay.js` mounts a Shadow-DOM warning with a 5-second countdown. When the timer hits zero, the content script asks the service worker to close the tab via `chrome.tabs.remove()`.
@@ -201,7 +204,8 @@ Open `chrome-extension://<id>/dashboard.html`. The extension ID is visible on th
 3. The date picker lets you scroll back up to 30 days.
 4. **Log out** clears the DOM (shoulder-surf defense) and returns to the password screen.
 
-The dashboard is read-only. It does not edit logs or settings.
+5. The **Allowed URLs** panel lets the parent add URL substrings that always pass classification (stored in `allowlist`).
+6. The **Settings** panel lets the parent change the API key (validated against Anthropic before saving) or the password (requires current password; re-hashes with a fresh salt).
 
 ---
 
@@ -209,11 +213,14 @@ The dashboard is read-only. It does not edit logs or settings.
 
 Everything is in `chrome.storage.local`, which is a per-extension key-value store scoped to the local browser profile. Nothing leaves the device except Claude API calls.
 
-| Key                 | Shape                                                       | Written by     |
-| ------------------- | ----------------------------------------------------------- | -------------- |
-| `apiKey`            | string, must start with `sk-ant-`                           | `setup.js`     |
-| `parentPassword`    | `{salt: <hex32>, hash: <sha256(salt + ":" + password)>}`    | `setup.js`     |
-| `log:YYYY-MM-DD`    | array of visit entries (see below)                          | `logger.js`    |
+| Key                 | Shape                                                       | Written by           |
+| ------------------- | ----------------------------------------------------------- | -------------------- |
+| `apiKey`            | string, must start with `sk-ant-`                           | `setup.js`, `dashboard.js` |
+| `parentPassword`    | `{salt: <hex32>, hash: <sha256(salt + ":" + password)>}`    | `setup.js`, `dashboard.js` |
+| `authState`         | `{failCount, lockoutUntil, lastFailAt}`                     | `dashboard.js`       |
+| `allowlist`         | `string[]` — substrings matched against URL                 | `dashboard.js`       |
+| `verdictCache`      | `[url, {verdict, reason, confidence}][]` — LRU entries      | `classifier.js`      |
+| `log:YYYY-MM-DD`    | array of visit entries (see below)                          | `logger.js`          |
 
 Each day is one key. A visit entry looks like:
 
@@ -234,7 +241,7 @@ Each day is one key. A visit entry looks like:
 
 - **URL / title / reason** are truncated to 500 / 200 / 200 characters respectively.
 - **durationMs** is updated whenever the focused tab's URL changes (SPA nav or full-page reload), focus moves to another tab/window, or the tab closes. See [Duration tracking](#duration-tracking) for the full model, manual test cases, and known limitations. A write lock (`logger.js:40`) keeps duration patches from racing with concurrent log appends.
-- **source** is one of `api` (fresh Claude call), `cache` (in-memory LRU hit), or `fallback` (internal URL, no API key, API error).
+- **source** is one of `api` (fresh Claude call), `cache` (LRU hit — from memory or restored from storage), `allowlist` (parent bypass), or `fallback` (internal URL, no API key, API error).
 - **Cap:** 5000 entries per day. If a bug floods logs, the oldest entries in that day are dropped first.
 
 ### Browsing history vs. the log
@@ -376,5 +383,4 @@ await chrome.storage.local.remove(keys);
 - **Chromium only.** Uses MV3 service workers and `chrome.storage.local`. Firefox port would need manifest adjustments.
 - **Not a security sandbox.** A determined child with developer-tools access can disable the extension at `chrome://extensions`. True kiosk-level lockdown requires OS-level parental controls; FocusGuard is designed for cases where a simple, hidden tool is enough.
 - **Depends on Anthropic API availability.** If `api.anthropic.com` is unreachable, the classifier fails open and pages pass through unblocked (by design — see above).
-- **Title-only classification.** The classifier sees the URL and `<title>` but not page body text. That keeps request size and latency low, but some legitimately-titled-but-off-task pages can slip through, and some well-titled educational pages on suspicious domains get blocked. The system prompt is tuned to lean toward allow when uncertain.
-- **In-memory cache only.** Verdicts aren't persisted across service-worker restarts (Chrome aggressively terminates idle MV3 workers), so the same URL may be re-classified if the worker has been evicted. This is a cost/freshness trade-off — re-querying on fresh workers keeps verdicts current.
+- **Body excerpt is attacker-controlled.** The 2,000-char visible-text excerpt fed to the classifier comes from `document.body.innerText`, which a malicious page can set to anything. The system prompt labels it untrusted and the classifier is prompted to ignore embedded instructions, but a sufficiently adversarial page could theoretically influence the verdict. The excerpt is collapsed to single spaces before sending to prevent injected newlines from visually spawning new prompt sections.
