@@ -63,13 +63,13 @@ function persistCache() {
   );
 }
 
-// --- Dev seeding (Phase 2, before Phase 6 setup UI exists) ---
+// --- Dev seeding ---
 // To test locally, paste into the service worker DevTools console:
 //
 //   chrome.storage.local.set({ apiKey: 'sk-ant-api03-...' })
 //
 // Then reload any page. The key is read on demand and cached
-// per-worker-lifetime. Phase 6 will replace this with a setup form.
+// per-worker-lifetime. The setup UI (setup.html) is the production path.
 
 // --- API key retrieval ---
 
