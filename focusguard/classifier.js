@@ -15,7 +15,7 @@
 
 // --- Config ---
 
-const MODEL = 'claude-haiku-4-5';
+const MODEL = 'claude-haiku-4-5-20251001';
 const API_URL = 'https://api.anthropic.com/v1/messages';
 const API_VERSION = '2023-06-01';
 // Generous enough to absorb cold-start DNS/TLS setup on the first request
@@ -28,9 +28,14 @@ const CACHE_MAX_ENTRIES = 500;
 
 self.FocusGuardClassifier = self.FocusGuardClassifier || {};
 
-// --- Cache (in-memory LRU) ---
+// --- Cache (LRU, persisted to chrome.storage.local) ---
+// Service workers are killed after ~30s of idle time, resetting all in-memory
+// state. Persisting to storage means verdicts survive restarts and the child
+// doesn't burn API quota re-classifying the same sites after every idle gap.
 
+const CACHE_STORAGE_KEY = 'verdictCache';
 const verdictCache = new Map();  // url -> {verdict, reason, confidence}
+let cacheHydrated = false;
 
 function cacheGet(url) {
   if (!verdictCache.has(url)) return null;
@@ -49,6 +54,29 @@ function cachePut(url, entry) {
     const oldestKey = verdictCache.keys().next().value;
     verdictCache.delete(oldestKey);
   }
+}
+
+async function hydrateCache() {
+  if (cacheHydrated) return;
+  cacheHydrated = true;
+  try {
+    const stored = await chrome.storage.local.get(CACHE_STORAGE_KEY);
+    const entries = stored[CACHE_STORAGE_KEY];
+    if (!Array.isArray(entries)) return;
+    for (const [url, entry] of entries) {
+      if (typeof url === 'string' && entry) verdictCache.set(url, entry);
+    }
+  } catch (e) {
+    console.warn('[FocusGuard] cache hydrate failed:', e);
+  }
+}
+
+function persistCache() {
+  // Fire-and-forget — never block the classify hot path.
+  const entries = [...verdictCache.entries()];
+  chrome.storage.local.set({ [CACHE_STORAGE_KEY]: entries }).catch((e) =>
+    console.warn('[FocusGuard] cache persist failed:', e)
+  );
 }
 
 // --- Dev seeding (Phase 2, before Phase 6 setup UI exists) ---
@@ -227,6 +255,9 @@ async function classifyPage({ url, title, bodyText }) {
     return { verdict: 'allow', reason: 'internal', confidence: 1, source: 'fallback' };
   }
 
+  // Restore persisted verdicts on the first call after a service-worker restart.
+  await hydrateCache();
+
   // Parent allowlist wins over both cache and API — removing an entry
   // means subsequent visits fall through to normal classification.
   const allowlist = await getAllowlist();
@@ -261,6 +292,7 @@ async function classifyPage({ url, title, bodyText }) {
   }
 
   cachePut(url, parsed);
+  persistCache();
   return { ...parsed, source: 'api' };
 }
 

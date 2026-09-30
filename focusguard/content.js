@@ -55,7 +55,7 @@
   // classifier sanitizes again before sending.
   let bodyText = '';
   try {
-    bodyText = (document.body && document.body.innerText || '').slice(0, 4000);
+    bodyText = (document.body && document.body.innerText || '').slice(0, 2000);
   } catch (_) {
     // Some pages throw on innerText access; fall through with empty string.
   }
