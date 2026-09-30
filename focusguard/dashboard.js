@@ -69,16 +69,45 @@
       .join('');
   }
 
-  // parentPassword shape written by Phase 6:
-  //   { salt: '<hex>', hash: '<hex of sha256(salt + ":" + password)>' }
+  async function pbkdf2Hex(salt, password, iterations = 200_000) {
+    const enc = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']
+    );
+    const bits = await crypto.subtle.deriveBits(
+      { name: 'PBKDF2', salt: enc.encode(salt), iterations, hash: 'SHA-256' },
+      keyMaterial,
+      256
+    );
+    return [...new Uint8Array(bits)]
+      .map((b) => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  // parentPassword shape: { salt: '<hex>', hash: '<hex>', algo?: 'pbkdf2' }
+  // Legacy records have no algo field (SHA-256). They are auto-migrated on
+  // first successful login.
   async function verifyPassword(password) {
     try {
       const { parentPassword } = await chrome.storage.local.get('parentPassword');
       if (!parentPassword || !parentPassword.salt || !parentPassword.hash) {
         return { ok: false, error: 'No password set. Complete setup first.' };
       }
-      const computed = await sha256Hex(parentPassword.salt + ':' + password);
-      return { ok: computed === parentPassword.hash };
+      let computed;
+      if (parentPassword.algo === 'pbkdf2') {
+        computed = await pbkdf2Hex(parentPassword.salt, password);
+      } else {
+        // Legacy SHA-256 record — verify, then transparently migrate
+        computed = await sha256Hex(parentPassword.salt + ':' + password);
+      }
+      if (computed !== parentPassword.hash) return { ok: false };
+      // Successful legacy login — upgrade to PBKDF2 in the background
+      if (!parentPassword.algo) {
+        const newHash = await pbkdf2Hex(parentPassword.salt, password);
+        chrome.storage.local.set({
+          parentPassword: { salt: parentPassword.salt, hash: newHash, algo: 'pbkdf2' }
+        }).catch(() => {});
+      }
+      return { ok: true };
     } catch (_) {
       return { ok: false, error: 'Storage error' };
     }
@@ -469,9 +498,9 @@
       // Hash the new password with a fresh salt.
       const salt = [...crypto.getRandomValues(new Uint8Array(16))]
         .map((b) => b.toString(16).padStart(2, '0')).join('');
-      const hash = await sha256Hex(salt + ':' + next);
+      const hash = await pbkdf2Hex(salt, next);
       try {
-        await chrome.storage.local.set({ parentPassword: { salt, hash } });
+        await chrome.storage.local.set({ parentPassword: { salt, hash, algo: 'pbkdf2' } });
         $('settings-pw-current').value = '';
         $('settings-pw-new').value = '';
         $('settings-pw-confirm').value = '';

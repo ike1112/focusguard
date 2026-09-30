@@ -46,6 +46,20 @@
       .join('');
   }
 
+  async function pbkdf2Hex(salt, password, iterations = 200_000) {
+    const enc = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']
+    );
+    const bits = await crypto.subtle.deriveBits(
+      { name: 'PBKDF2', salt: enc.encode(salt), iterations, hash: 'SHA-256' },
+      keyMaterial,
+      256
+    );
+    return [...new Uint8Array(bits)]
+      .map((b) => b.toString(16).padStart(2, '0')).join('');
+  }
+
   function genSalt() {
     const bytes = new Uint8Array(16);
     crypto.getRandomValues(bytes);
@@ -138,11 +152,11 @@
       setStatus('Saving...');
       // New salt every time, even on reconfigure — never reuse a salt with a new password.
       const salt = genSalt();
-      const hash = await sha256Hex(salt + ':' + pw);
+      const hash = await pbkdf2Hex(salt, pw);
 
       await chrome.storage.local.set({
         apiKey,
-        parentPassword: { salt, hash },
+        parentPassword: { salt, hash, algo: 'pbkdf2' },
       });
 
       setStatus('');
