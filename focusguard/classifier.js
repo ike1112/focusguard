@@ -1,8 +1,8 @@
 /**
  * classifier.js — Claude Haiku page classifier
  *
- * Loaded by background.js via importScripts('classifier.js').
- * Global entry point: self.FocusGuardClassifier.classifyPage({url, title})
+ * Imported as an ES module by background.js.
+ * Public entry point: classifyPage({url, title, bodyText})
  *
  * Returns a promise that always resolves to:
  *   { verdict: 'allow'|'block', reason, confidence, source }
@@ -11,7 +11,7 @@
  * bugs here to break the child's ability to use the browser.
  */
 
-import { CACHE_MAX_ENTRIES, STRIP_PARAMS, normalizeForCache, parseVerdict, makeLRU } from './lib/classifier-pure.js';
+import { normalizeForCache, parseVerdict, makeLRU } from './lib/classifier-pure.js';
 
 // --- Config ---
 
@@ -250,7 +250,7 @@ async function classifyPage({ url, title, bodyText }) {
   // rather than firing a second API request.
   if (inFlight.has(normalizedUrl)) {
     const existing = await inFlight.get(normalizedUrl);
-    return existing ? { ...existing, source: 'cache' } : { verdict: 'allow', reason: 'api-error', confidence: 1, source: 'fallback' };
+    return existing ? { ...existing, source: 'dedup' } : { verdict: 'allow', reason: 'api-error', confidence: 1, source: 'fallback' };
   }
 
   const apiKey = await getApiKey();
