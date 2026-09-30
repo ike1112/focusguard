@@ -36,6 +36,10 @@ const CACHE_STORAGE_KEY = 'verdictCache';
 const { cacheGet, cachePut, cache: verdictCache } = makeLRU();
 let cacheHydrated = false;
 
+// Dedup concurrent API calls for the same normalized URL so a burst of
+// navigation events for the same page doesn't trigger multiple round-trips.
+const inFlight = new Map();
+
 async function hydrateCache() {
   if (cacheHydrated) return;
   cacheHydrated = true;
@@ -235,9 +239,18 @@ async function classifyPage({ url, title, bodyText }) {
     };
   }
 
-  const cached = cacheGet(normalizeForCache(url));
+  const normalizedUrl = normalizeForCache(url);
+
+  const cached = cacheGet(normalizedUrl);
   if (cached) {
     return { ...cached, source: 'cache' };
+  }
+
+  // If another call is already waiting on the same URL, piggyback on it
+  // rather than firing a second API request.
+  if (inFlight.has(normalizedUrl)) {
+    const existing = await inFlight.get(normalizedUrl);
+    return existing ? { ...existing, source: 'cache' } : { verdict: 'allow', reason: 'api-error', confidence: 1, source: 'fallback' };
   }
 
   const apiKey = await getApiKey();
@@ -249,13 +262,21 @@ async function classifyPage({ url, title, bodyText }) {
     return { verdict: 'allow', reason: 'no-api-key', confidence: 1, source: 'fallback' };
   }
 
-  const parsed = await callClaude(apiKey, url, title || '', bodyText || '');
+  const promise = callClaude(apiKey, url, title || '', bodyText || '');
+  inFlight.set(normalizedUrl, promise);
+  let parsed;
+  try {
+    parsed = await promise;
+  } finally {
+    inFlight.delete(normalizedUrl);
+  }
+
   if (!parsed) {
     // fail-open without caching — let next visit retry
     return { verdict: 'allow', reason: 'api-error', confidence: 1, source: 'fallback' };
   }
 
-  cachePut(normalizeForCache(url), parsed);
+  cachePut(normalizedUrl, parsed);
   persistCache();
   return { ...parsed, source: 'api' };
 }
