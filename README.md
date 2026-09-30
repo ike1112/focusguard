@@ -6,7 +6,7 @@ When your child opens a website, FocusGuard reads the page and decides if it's s
 
 You install it once on your child's computer, take two minutes to set it up, and from then on it runs in the background. No icons, no popups, no buttons — nothing for your child to see or turn off.
 
-- 🔒 **Private by design.** Your child's browsing stays on your computer. No company server, no account, no cloud storage.
+- 🔒 **Private by design.** Your child's activity log, API key, and password stay on your computer. The only data that leaves is a short page excerpt sent to the AI to classify each site — nothing is stored by FocusGuard or any company server.
 - 👨‍👩‍👧 **Only you can see the activity.** A hidden password-protected page shows every site your child has opened today and for the past 30 days.
 - 🌱 **Gentle, not scary.** No alarms or lectures — just a calm "please get back to homework" screen.
 - 💰 **Almost free.** FocusGuard itself costs nothing. The AI that checks the pages usually costs a few cents a month.
