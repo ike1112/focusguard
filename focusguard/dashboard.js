@@ -5,7 +5,7 @@
  * chrome.storage.local keys written by Phase 4's logger.
  */
 
-'use strict';
+import { formatDuration, escapeHtml } from './lib/dashboard-pure.js';
 
 (function () {
   // --- Config ---
@@ -33,31 +33,11 @@
     $('view-main').hidden = (which !== 'main');
   }
 
-  function escapeHtml(s) {
-    return String(s)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
-
   function formatTime(ts) {
     const d = new Date(ts);
     return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
   }
 
-  function formatDuration(ms) {
-    if (!ms || ms < 1000) return '<1s';
-    const sec = Math.round(ms / 1000);
-    if (sec < 60) return sec + 's';
-    const min = Math.floor(sec / 60);
-    const remSec = sec % 60;
-    if (min < 60) return remSec ? `${min}m ${remSec}s` : `${min}m`;
-    const hr = Math.floor(min / 60);
-    const remMin = min % 60;
-    return remMin ? `${hr}h ${remMin}m` : `${hr}h`;
-  }
 
   // --- Auth ---
 

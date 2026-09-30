@@ -1,31 +1,7 @@
 // tests/dashboard.js
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-
-// --- Copied from focusguard/dashboard.js (pure, no DOM deps) ---
-
-function formatDuration(ms) {
-  if (!ms || ms < 1000) return '<1s';
-  const sec = Math.round(ms / 1000);
-  if (sec < 60) return sec + 's';
-  const min = Math.floor(sec / 60);
-  const remSec = sec % 60;
-  if (min < 60) return remSec ? `${min}m ${remSec}s` : `${min}m`;
-  const hr = Math.floor(min / 60);
-  const remMin = min % 60;
-  return remMin ? `${hr}h ${remMin}m` : `${hr}h`;
-}
-
-function escapeHtml(s) {
-  return String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-// --- Tests ---
+import { formatDuration, escapeHtml } from '../focusguard/lib/dashboard-pure.js';
 
 describe('formatDuration', () => {
   it('returns <1s for 0ms', () => { assert.equal(formatDuration(0), '<1s'); });

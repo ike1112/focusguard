@@ -6,15 +6,10 @@
  * daily log-prune alarm.
  */
 
-'use strict';
-
 // --- Module loading ---
 
-try {
-  importScripts('classifier.js', 'logger.js');
-} catch (e) {
-  console.error('[FocusGuard] importScripts failed:', e);
-}
+import './classifier.js';
+import './logger.js';
 
 // Fail-open shim: if classifier never loaded, PAGE_DATA must still
 // receive a valid verdict so the child can keep browsing.

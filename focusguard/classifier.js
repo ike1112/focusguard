@@ -11,7 +11,7 @@
  * bugs here to break the child's ability to use the browser.
  */
 
-'use strict';
+import { CACHE_MAX_ENTRIES, STRIP_PARAMS, normalizeForCache, parseVerdict, makeLRU } from './lib/classifier-pure.js';
 
 // --- Config ---
 
@@ -22,7 +22,6 @@ const API_VERSION = '2023-06-01';
 // after a service-worker wake. Haiku typically responds in <1s when warm.
 const REQUEST_TIMEOUT_MS = 15000;
 const MAX_TOKENS = 150;
-const CACHE_MAX_ENTRIES = 500;
 
 // --- Global namespace ---
 
@@ -34,27 +33,8 @@ self.FocusGuardClassifier = self.FocusGuardClassifier || {};
 // doesn't burn API quota re-classifying the same sites after every idle gap.
 
 const CACHE_STORAGE_KEY = 'verdictCache';
-const verdictCache = new Map();  // url -> {verdict, reason, confidence}
+const { cacheGet, cachePut, cache: verdictCache } = makeLRU();
 let cacheHydrated = false;
-
-function cacheGet(url) {
-  if (!verdictCache.has(url)) return null;
-  // LRU bump: delete + reinsert so insertion order reflects recency
-  const entry = verdictCache.get(url);
-  verdictCache.delete(url);
-  verdictCache.set(url, entry);
-  return entry;
-}
-
-function cachePut(url, entry) {
-  if (verdictCache.has(url)) verdictCache.delete(url);
-  verdictCache.set(url, entry);
-  // Evict oldest if over capacity
-  if (verdictCache.size > CACHE_MAX_ENTRIES) {
-    const oldestKey = verdictCache.keys().next().value;
-    verdictCache.delete(oldestKey);
-  }
-}
 
 async function hydrateCache() {
   if (cacheHydrated) return;
@@ -77,27 +57,6 @@ function persistCache() {
   chrome.storage.local.set({ [CACHE_STORAGE_KEY]: entries }).catch((e) =>
     console.warn('[FocusGuard] cache persist failed:', e)
   );
-}
-
-// Tracking/session params that appear in URLs but don't change page content.
-// Stripping them lets YouTube, Reddit, etc. share a cache entry regardless
-// of how the link was shared. The raw URL is still sent to the API and logged.
-const STRIP_PARAMS = new Set([
-  'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'utm_id',
-  'fbclid', 'gclid', 'msclkid', 'twclid', 'li_fat_id', 'yclid', 'igshid',
-  'si', 'feature', 'pp', 'ref', 'ref_src', 'ref_url', '_ga',
-]);
-
-function normalizeForCache(url) {
-  try {
-    const u = new URL(url);
-    for (const key of [...u.searchParams.keys()]) {
-      if (STRIP_PARAMS.has(key)) u.searchParams.delete(key);
-    }
-    return u.toString();
-  } catch {
-    return url;  // unparseable — use raw
-  }
 }
 
 // --- Dev seeding (Phase 2, before Phase 6 setup UI exists) ---
@@ -242,22 +201,6 @@ async function callClaude(apiKey, url, title, bodyText) {
     return null;
   } finally {
     clearTimeout(timeout);
-  }
-}
-
-function parseVerdict(text) {
-  try {
-    // Strip any accidental code fences
-    const cleaned = text.trim().replace(/^```(?:json)?\s*/, '').replace(/```$/, '').trim();
-    const parsed = JSON.parse(cleaned);
-    const verdict = parsed.verdict === 'block' ? 'block' : 'allow';
-    const reason = typeof parsed.reason === 'string' ? parsed.reason.slice(0, 200) : '';
-    const confidence = typeof parsed.confidence === 'number'
-      ? Math.max(0, Math.min(1, parsed.confidence))
-      : 0.5;
-    return { verdict, reason, confidence };
-  } catch {
-    return null;  // caller will fail-open
   }
 }
 

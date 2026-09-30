@@ -9,7 +9,7 @@
  * Namespace: self.FocusGuardLogger
  */
 
-'use strict';
+import { dateKey, extractDomain, truncate } from './lib/logger-pure.js';
 
 // --- Config ---
 const RETENTION_DAYS = 30;
@@ -44,24 +44,6 @@ function withLock(fn) {
 }
 
 // --- Storage helpers ---
-
-function dateKey(ts) {
-  const d = new Date(ts == null ? Date.now() : ts);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `log:${y}-${m}-${day}`;
-}
-
-function extractDomain(url) {
-  try { return new URL(url).hostname.replace(/^www\./, ''); }
-  catch { return ''; }
-}
-
-function truncate(s, n) {
-  if (!s) return '';
-  return s.length > n ? s.slice(0, n) : s;
-}
 
 function makeId() {
   // 8 chars of base36 randomness + 4 chars of timestamp tail.

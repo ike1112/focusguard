@@ -1,28 +1,7 @@
 // tests/logger.js
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-
-// --- Copied from focusguard/logger.js (pure, no chrome deps) ---
-
-function dateKey(ts) {
-  const d = new Date(ts == null ? Date.now() : ts);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `log:${y}-${m}-${day}`;
-}
-
-function extractDomain(url) {
-  try { return new URL(url).hostname.replace(/^www\./, ''); }
-  catch { return ''; }
-}
-
-function truncate(s, n) {
-  if (!s) return '';
-  return s.length > n ? s.slice(0, n) : s;
-}
-
-// --- Tests ---
+import { dateKey, extractDomain, truncate } from '../focusguard/lib/logger-pure.js';
 
 describe('dateKey', () => {
   it('formats a known timestamp correctly', () => {

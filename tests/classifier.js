@@ -1,54 +1,12 @@
 // tests/classifier.js
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-
-// --- Copied from focusguard/classifier.js (pure, no chrome deps) ---
-
-const STRIP_PARAMS = new Set([
-  'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'utm_id',
-  'fbclid', 'gclid', 'msclkid', 'twclid', 'li_fat_id', 'yclid', 'igshid',
-  'si', 'feature', 'pp', 'ref', 'ref_src', 'ref_url', '_ga',
-]);
-
-function normalizeForCache(url) {
-  try {
-    const u = new URL(url);
-    for (const key of [...u.searchParams.keys()]) {
-      if (STRIP_PARAMS.has(key)) u.searchParams.delete(key);
-    }
-    return u.toString();
-  } catch { return url; }
-}
-
-function parseVerdict(text) {
-  try {
-    const cleaned = text.trim().replace(/^```(?:json)?\s*/, '').replace(/```$/, '').trim();
-    const parsed = JSON.parse(cleaned);
-    const verdict = parsed.verdict === 'block' ? 'block' : 'allow';
-    const reason = typeof parsed.reason === 'string' ? parsed.reason.slice(0, 200) : '';
-    const confidence = typeof parsed.confidence === 'number'
-      ? Math.max(0, Math.min(1, parsed.confidence)) : 0.5;
-    return { verdict, reason, confidence };
-  } catch { return null; }
-}
-
-const CACHE_MAX_ENTRIES = 500;
-function makeLRU() {
-  const cache = new Map();
-  function cacheGet(url) {
-    if (!cache.has(url)) return null;
-    const entry = cache.get(url); cache.delete(url); cache.set(url, entry);
-    return entry;
-  }
-  function cachePut(url, entry) {
-    if (cache.has(url)) cache.delete(url);
-    cache.set(url, entry);
-    if (cache.size > CACHE_MAX_ENTRIES) cache.delete(cache.keys().next().value);
-  }
-  return { cacheGet, cachePut, cache };
-}
-
-// --- Tests ---
+import {
+  CACHE_MAX_ENTRIES,
+  normalizeForCache,
+  parseVerdict,
+  makeLRU,
+} from '../focusguard/lib/classifier-pure.js';
 
 describe('normalizeForCache', () => {
   it('strips utm params', () => {
