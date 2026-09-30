@@ -152,6 +152,46 @@
           No allowed URLs yet. Add one above to skip classification for that page or domain.
         </div>
       </section>
+
+      <section class="panel settings-panel">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">Settings</h2>
+            <p class="panel-sub">Change your API key or parent password.</p>
+          </div>
+        </div>
+
+        <form id="settings-key-form" class="settings-form" autocomplete="off">
+          <h3 class="settings-section-title">Claude API key</h3>
+          <label for="settings-key-input" class="sr-only">New API key</label>
+          <input id="settings-key-input" type="password" spellcheck="false"
+                 placeholder="sk-ant-api03-..." maxlength="200">
+          <div class="settings-actions">
+            <button type="submit" class="btn-primary">
+              <span>Save key</span>
+            </button>
+          </div>
+          <p id="settings-key-error" class="settings-msg settings-msg-error" hidden></p>
+          <p id="settings-key-ok" class="settings-msg settings-msg-ok" hidden>API key updated.</p>
+        </form>
+
+        <form id="settings-pw-form" class="settings-form settings-form-border" autocomplete="off">
+          <h3 class="settings-section-title">Parent password</h3>
+          <label for="settings-pw-current" class="sr-only">Current password</label>
+          <input id="settings-pw-current" type="password" placeholder="Current password">
+          <label for="settings-pw-new" class="sr-only">New password</label>
+          <input id="settings-pw-new" type="password" placeholder="New password (min 6 chars)" minlength="6">
+          <label for="settings-pw-confirm" class="sr-only">Confirm new password</label>
+          <input id="settings-pw-confirm" type="password" placeholder="Confirm new password">
+          <div class="settings-actions">
+            <button type="submit" class="btn-primary">
+              <span>Change password</span>
+            </button>
+          </div>
+          <p id="settings-pw-error" class="settings-msg settings-msg-error" hidden></p>
+          <p id="settings-pw-ok" class="settings-msg settings-msg-ok" hidden>Password updated.</p>
+        </form>
+      </section>
     </main>
   </section>
 

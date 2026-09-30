@@ -386,6 +386,113 @@
     });
   }
 
+  // --- Settings: API key + password change ---
+
+  function setSettingsMsg(errorId, okId, msg, isError) {
+    const err = $(errorId);
+    const ok = $(okId);
+    err.hidden = true;
+    ok.hidden = true;
+    if (!msg) return;
+    if (isError) { err.textContent = msg; err.hidden = false; }
+    else { ok.hidden = false; }
+  }
+
+  async function testApiKey(key) {
+    // Validate by hitting the models endpoint — cheap, no tokens consumed.
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/models', {
+        headers: {
+          'x-api-key': key,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+      });
+      return res.ok || res.status === 404;  // 404 = valid key, unknown endpoint
+    } catch {
+      return false;
+    }
+  }
+
+  function wireSettingsControls() {
+    $('settings-key-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const input = $('settings-key-input');
+      const key = input.value.trim();
+      setSettingsMsg('settings-key-error', 'settings-key-ok', '');
+      if (!key.startsWith('sk-ant-')) {
+        setSettingsMsg('settings-key-error', 'settings-key-ok', 'Key must start with sk-ant-', true);
+        return;
+      }
+      const btn = e.target.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      btn.querySelector('span').textContent = 'Validating…';
+      const valid = await testApiKey(key);
+      btn.disabled = false;
+      btn.querySelector('span').textContent = 'Save key';
+      if (!valid) {
+        setSettingsMsg('settings-key-error', 'settings-key-ok', 'Key rejected by Anthropic API. Check it and try again.', true);
+        return;
+      }
+      try {
+        await chrome.storage.local.set({ apiKey: key });
+        input.value = '';
+        setSettingsMsg('settings-key-error', 'settings-key-ok', '', false);
+      } catch {
+        setSettingsMsg('settings-key-error', 'settings-key-ok', 'Storage error — try again.', true);
+      }
+    });
+
+    $('settings-pw-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const current = $('settings-pw-current').value;
+      const next = $('settings-pw-new').value;
+      const confirm = $('settings-pw-confirm').value;
+      setSettingsMsg('settings-pw-error', 'settings-pw-ok', '');
+      if (!current || !next || !confirm) {
+        setSettingsMsg('settings-pw-error', 'settings-pw-ok', 'Fill in all three fields.', true);
+        return;
+      }
+      if (next.length < 6) {
+        setSettingsMsg('settings-pw-error', 'settings-pw-ok', 'New password must be at least 6 characters.', true);
+        return;
+      }
+      if (next !== confirm) {
+        setSettingsMsg('settings-pw-error', 'settings-pw-ok', 'New passwords do not match.', true);
+        return;
+      }
+      const check = await verifyPassword(current);
+      if (!check.ok) {
+        setSettingsMsg('settings-pw-error', 'settings-pw-ok', check.error || 'Current password is wrong.', true);
+        return;
+      }
+      // Hash the new password with a fresh salt.
+      const salt = [...crypto.getRandomValues(new Uint8Array(16))]
+        .map((b) => b.toString(16).padStart(2, '0')).join('');
+      const hash = await sha256Hex(salt + ':' + next);
+      try {
+        await chrome.storage.local.set({ parentPassword: { salt, hash } });
+        $('settings-pw-current').value = '';
+        $('settings-pw-new').value = '';
+        $('settings-pw-confirm').value = '';
+        setSettingsMsg('settings-pw-error', 'settings-pw-ok', '', false);
+      } catch {
+        setSettingsMsg('settings-pw-error', 'settings-pw-ok', 'Storage error — try again.', true);
+      }
+    });
+
+    // Clear status messages when the user starts typing again
+    ['settings-key-input', 'settings-pw-current', 'settings-pw-new', 'settings-pw-confirm']
+      .forEach((id) => {
+        $(id).addEventListener('input', () => {
+          $('settings-key-error').hidden = true;
+          $('settings-key-ok').hidden = true;
+          $('settings-pw-error').hidden = true;
+          $('settings-pw-ok').hidden = true;
+        });
+      });
+  }
+
   // --- Main view + logout ---
 
   function initMainView() {
@@ -402,6 +509,7 @@
       renderDay();
     });
     wireAllowlistControls();
+    wireSettingsControls();
   }
 
   function logout() {
@@ -415,6 +523,12 @@
     $('allowlist-items').innerHTML = '';
     $('allowlist-input').value = '';
     setAllowlistError('');
+    $('settings-key-input').value = '';
+    $('settings-pw-current').value = '';
+    $('settings-pw-new').value = '';
+    $('settings-pw-confirm').value = '';
+    ['settings-key-error', 'settings-key-ok', 'settings-pw-error', 'settings-pw-ok']
+      .forEach((id) => { $(id).hidden = true; });
     $('auth-password').value = '';
     $('auth-error').hidden = true;
     showView('auth');
