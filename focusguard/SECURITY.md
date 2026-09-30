@@ -13,6 +13,7 @@
 | Removal from `chrome://extensions` | Force-install via Group Policy (see `docs/group-policy-install.md`) |
 | Disabling via `chrome://extensions` | Force-install removes Disable button |
 | Dashboard brute-force | Persistent lockout: 3 fails → 60s, 4th → 5m, 5+ → 30m |
+| Dashboard password offline attack | PBKDF2-SHA-256 (200k iterations) via WebCrypto. Legacy SHA-256 records auto-migrate on next successful login. |
 | API key exfiltration | Stored in `chrome.storage.local`; not visible from page scripts (isolated world) |
 | Overlay removal via page JS | Closed-mode Shadow DOM + isolated-world content script |
 | Prompt injection via page title | Title HTML-escaped before overlay render; model sees it as plain text |

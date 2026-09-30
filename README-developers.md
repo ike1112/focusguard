@@ -9,7 +9,7 @@ FocusGuard is an MV3 Chrome extension that classifies every page visit via the C
 - **Content-aware classification** — each page sends URL, title, and a 2,000-char visible-text excerpt; the classifier uses the excerpt to distinguish an educational YouTube video from a gaming one.
 - **Persistent LRU verdict cache** — 500-entry cache survives MV3 service-worker restarts via `chrome.storage.local`, so the same URL is only ever billed once.
 - **SPA-aware** — `chrome.tabs.onUpdated` re-classifies pushState navigations (YouTube, Reddit, Twitter) that `content.js` never sees because the page doesn't reload.
-- **Password-gated parent dashboard** — salted SHA-256 password, persistent lockout after repeated failures, shoulder-surf-safe logout.
+- **Password-gated parent dashboard** — PBKDF2-SHA-256 password (200k iterations), persistent lockout after repeated failures, shoulder-surf-safe logout.
 
 ---
 
@@ -173,7 +173,7 @@ The setup form (`setup.html`) asks for:
 
 On submit:
 - The API key is stored as-is in `chrome.storage.local` under `apiKey`.
-- A random 16-byte salt is generated with `crypto.getRandomValues`, then `sha256(salt + ":" + password)` is stored as `parentPassword: {salt, hash}`.
+- A random 16-byte salt is generated with `crypto.getRandomValues`, then `pbkdf2(salt, password, 200k)` is stored as `parentPassword: {salt, hash, algo: 'pbkdf2'}`.
 - A success screen shows a link to the dashboard.
 
 You can re-run setup any time by navigating to `chrome-extension://<id>/setup.html`. Re-submitting replaces both the API key and the password (a fresh salt is generated — salts are never reused).
@@ -216,7 +216,7 @@ Everything is in `chrome.storage.local`, which is a per-extension key-value stor
 | Key                 | Shape                                                       | Written by           |
 | ------------------- | ----------------------------------------------------------- | -------------------- |
 | `apiKey`            | string, must start with `sk-ant-`                           | `setup.js`, `dashboard.js` |
-| `parentPassword`    | `{salt: <hex32>, hash: <sha256(salt + ":" + password)>}`    | `setup.js`, `dashboard.js` |
+| `parentPassword`    | `{salt: <hex32>, hash: <pbkdf2(salt, password, 200k)>, algo: 'pbkdf2'}` | `setup.js`, `dashboard.js` |
 | `authState`         | `{failCount, lockoutUntil, lastFailAt}`                     | `dashboard.js`       |
 | `allowlist`         | `string[]` — substrings matched against URL                 | `dashboard.js`       |
 | `verdictCache`      | `[url, {verdict, reason, confidence}][]` — LRU entries      | `classifier.js`      |
@@ -275,7 +275,7 @@ This is a parental-control tool. The threat model assumes the parent installs an
 ### What never leaves the device
 
 - Activity logs (URLs, titles, durations, verdicts) — **never sent anywhere**. They live only in `chrome.storage.local` on the local profile.
-- The parent password — only its salted SHA-256 hash is stored. The plaintext is never written to disk or sent.
+- The parent password — only its PBKDF2-derived hash is stored. The plaintext is never written to disk or sent.
 - Chrome browsing history — FocusGuard doesn't read it.
 
 ### What does leave the device
@@ -292,10 +292,10 @@ Only the page **URL** and **title** are sent to Anthropic, per classification, a
 
 ### Password handling
 
-- Hash = `sha256(salt + ":" + password)` with a fresh 16-byte random salt per setup.
-- Dashboard verifies by recomputing the hash and comparing in JS (`dashboard.js:78`).
+- PBKDF2-SHA-256 with 200,000 iterations via `crypto.subtle`. A successful login with a legacy SHA-256 record auto-migrates to PBKDF2 transparently.
+- A fresh 16-byte random salt is generated per setup or password change.
+- Dashboard verifies by recomputing the hash and comparing in JS (`dashboard.js`).
 - 3 failed attempts lock the dashboard for 60 seconds; on logout the DOM is cleared so cached entries don't linger behind the auth screen.
-- ⚠️ **SHA-256 is fast.** A determined attacker with filesystem access could brute-force a weak password offline. Pick a non-trivial password. A future hardening pass would swap SHA-256 for a slow KDF like PBKDF2 or Argon2.
 
 ### Overlay isolation
 
@@ -348,6 +348,7 @@ docs/
   - `await self.FocusGuardLogger._summary()` in the service-worker console — returns per-day entry counts.
   - `await chrome.storage.local.get(null)` — dump everything.
 - Project context and subagent output from the build phases live in `.claude/PRPs/`.
+- Run unit tests (pure functions, no Chrome deps): `node tests/run.js`
 
 ---
 
