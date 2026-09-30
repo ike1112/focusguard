@@ -5,9 +5,9 @@
  * chrome.storage.local. No server. Single network call to Anthropic to
  * confirm the key is valid.
  *
- * Storage contract (must match Phases 2 and 5):
+ * Storage contract:
  *   apiKey:         string, starts with 'sk-ant-'
- *   parentPassword: { salt: <hex32>, hash: <sha256(salt + ':' + password)> }
+ *   parentPassword: { salt: <hex32>, hash: <pbkdf2(salt, password, 200k)>, algo: 'pbkdf2' }
  *
  * Dev reset (service worker DevTools console):
  *   await chrome.storage.local.remove(['apiKey', 'parentPassword']);
@@ -37,14 +37,6 @@
   }
 
   // --- Crypto ---
-
-  async function sha256Hex(input) {
-    const buf = new TextEncoder().encode(input);
-    const digest = await crypto.subtle.digest('SHA-256', buf);
-    return [...new Uint8Array(digest)]
-      .map((b) => b.toString(16).padStart(2, '0'))
-      .join('');
-  }
 
   async function pbkdf2Hex(salt, password, iterations = 200_000) {
     const enc = new TextEncoder();
