@@ -1,8 +1,5 @@
-# Claude Code per-machine settings (permissions, etc.)
-.claude/settings.local.json
-
-# Ralph loop transient state (generated during execution, cleaned up on completion)
-.claude/prp-ralph.state.md
+# Claude Code — per-machine and AI planning files (not project source)
+.claude/
 
 # OS / editor noise
 .DS_Store
