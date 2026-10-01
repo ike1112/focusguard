@@ -79,8 +79,25 @@ async function main() {
     } catch { /* ignore corrupt file */ }
   }
 
+  // Use system Chrome on Windows — avoids bundled Chromium launch failures
+  const CHROME_PATHS = [
+    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+    process.env.CHROME_PATH,
+  ].filter(Boolean);
+
+  const executablePath = CHROME_PATHS.find(existsSync);
+  if (!executablePath) {
+    throw new Error(
+      'Chrome not found. Install Chrome or set CHROME_PATH in .env.\n' +
+      'Checked: ' + CHROME_PATHS.join(', ')
+    );
+  }
+  console.log('[scrape] Using Chrome at:', executablePath);
+
   const browser = await puppeteer.launch({
     headless: true,
+    executablePath,
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
   });
 
