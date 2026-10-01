@@ -81,7 +81,11 @@ async function handleClaude(reqBody) {
       status: 200,
       body: {
         content: [{ text }],
-        usage: { input_tokens: usage.prompt_tokens || 0, output_tokens: usage.completion_tokens || 0 },
+        usage: {
+          input_tokens:  usage.prompt_tokens     || 0,
+          output_tokens: usage.completion_tokens || 0,
+          cost:          usage.cost              || 0,  // OpenRouter returns real cost in USD
+        },
       },
     };
   }
@@ -147,7 +151,14 @@ async function handleTypesafe(reqBody) {
   const usage = body.usage || {};
   return {
     status: 200,
-    body: { answers, usage: { input_tokens: usage.prompt_tokens || 0, output_tokens: usage.completion_tokens || 0 } },
+    body: {
+      answers,
+      usage: {
+        input_tokens:  usage.prompt_tokens     || 0,
+        output_tokens: usage.completion_tokens || 0,
+        cost:          usage.cost              || 0,
+      },
+    },
   };
 }
 

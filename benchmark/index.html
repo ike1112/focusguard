@@ -524,14 +524,8 @@ const results = {
   typesafe: {},   // id → { verdict, subject, risk, riskLegend, latencyMs, inputTokens, outputTokens, error }
 };
 
-// ─── Claude Haiku pricing (per token) ────────────────────────────────────────
-// Haiku 3: $0.25/M input · $1.25/M output — update if using a different model
-const CLAUDE_INPUT_PRICE  = 0.25  / 1_000_000;
-const CLAUDE_OUTPUT_PRICE = 1.25  / 1_000_000;
-
-// Typesafe pricing: not publicly documented — fill in if known
-const TS_INPUT_PRICE  = 0;
-const TS_OUTPUT_PRICE = 0;
+// Cost comes directly from OpenRouter's usage.cost field (USD) — no price
+// constants needed. Both runners store totalCost as a running sum.
 
 const CLAUDE_SYSTEM = `You are FocusGuard, a classifier that decides whether a web page is appropriate for a student focused on homework.
 
@@ -617,6 +611,7 @@ async function runClaude() {
           latencyMs,
           inputTokens:  data?.usage?.input_tokens  || 0,
           outputTokens: data?.usage?.output_tokens || 0,
+          cost:         data?.usage?.cost          || 0,
         };
       }
     } catch (e) {
@@ -710,6 +705,7 @@ async function runTypesafe() {
           latencyMs,
           inputTokens:  data?.usage?.input_tokens  || 0,
           outputTokens: data?.usage?.output_tokens || 0,
+          cost:         data?.usage?.cost          || 0,
         };
       }
     } catch (e) {
@@ -739,45 +735,29 @@ function renderPerf() {
   const cr = Object.values(results.claude);
   const tr = Object.values(results.typesafe);
 
-  // Claude
-  const cLatencies = cr.filter(r => !r.error && r.latencyMs).map(r => r.latencyMs);
-  const cInput  = cr.reduce((s, r) => s + (r.inputTokens  || 0), 0);
-  const cOutput = cr.reduce((s, r) => s + (r.outputTokens || 0), 0);
-  const cCorrect = DATASET.filter(d => {
-    const r = results.claude[d.id];
-    return r && !r.error && r.verdict === d.gt;
-  }).length;
-  const cDone = cr.filter(r => !r.error).length;
+  const fmtCost = total => total > 0 ? '$' + total.toFixed(4) : '—';
+  const fmtLatency = arr => arr.length
+    ? Math.round(arr.reduce((a,b) => a+b, 0) / arr.length) + 'ms' : '—';
 
-  el('perf-claude-latency').textContent = cLatencies.length
-    ? Math.round(cLatencies.reduce((a,b) => a+b, 0) / cLatencies.length) + 'ms'
-    : '—';
-  el('perf-claude-cost').textContent = cInput + cOutput > 0
-    ? '$' + (cInput * CLAUDE_INPUT_PRICE + cOutput * CLAUDE_OUTPUT_PRICE).toFixed(4)
-    : '—';
-  el('perf-claude-acc').textContent = cDone > 0
-    ? Math.round(cCorrect / cDone * 100) + '%'
-    : '—';
+  // Claude
+  const cLatencies = cr.filter(r => !r.error).map(r => r.latencyMs).filter(Boolean);
+  const cCost    = cr.reduce((s, r) => s + (r.cost || 0), 0);
+  const cCorrect = DATASET.filter(d => { const r = results.claude[d.id]; return r && !r.error && r.verdict === d.gt; }).length;
+  const cDone    = cr.filter(r => !r.error).length;
+
+  el('perf-claude-latency').textContent = fmtLatency(cLatencies);
+  el('perf-claude-cost').textContent    = cDone > 0 ? fmtCost(cCost) : '—';
+  el('perf-claude-acc').textContent     = cDone > 0 ? Math.round(cCorrect / cDone * 100) + '%' : '—';
 
   // Typesafe
-  const tLatencies = tr.filter(r => !r.error && r.latencyMs).map(r => r.latencyMs);
-  const tInput  = tr.reduce((s, r) => s + (r.inputTokens  || 0), 0);
-  const tOutput = tr.reduce((s, r) => s + (r.outputTokens || 0), 0);
-  const tCorrect = DATASET.filter(d => {
-    const r = results.typesafe[d.id];
-    return r && !r.error && r.verdict === d.gt;
-  }).length;
-  const tDone = tr.filter(r => !r.error).length;
+  const tLatencies = tr.filter(r => !r.error).map(r => r.latencyMs).filter(Boolean);
+  const tCost    = tr.reduce((s, r) => s + (r.cost || 0), 0);
+  const tCorrect = DATASET.filter(d => { const r = results.typesafe[d.id]; return r && !r.error && r.verdict === d.gt; }).length;
+  const tDone    = tr.filter(r => !r.error).length;
 
-  el('perf-ts-latency').textContent = tLatencies.length
-    ? Math.round(tLatencies.reduce((a,b) => a+b, 0) / tLatencies.length) + 'ms'
-    : '—';
-  el('perf-ts-cost').textContent = tInput + tOutput > 0 && (TS_INPUT_PRICE + TS_OUTPUT_PRICE) > 0
-    ? '$' + (tInput * TS_INPUT_PRICE + tOutput * TS_OUTPUT_PRICE).toFixed(4)
-    : tDone > 0 ? 'see console' : '—';
-  el('perf-ts-acc').textContent = tDone > 0
-    ? Math.round(tCorrect / tDone * 100) + '%'
-    : '—';
+  el('perf-ts-latency').textContent = fmtLatency(tLatencies);
+  el('perf-ts-cost').textContent    = tDone > 0 ? fmtCost(tCost) : '—';
+  el('perf-ts-acc').textContent     = tDone > 0 ? Math.round(tCorrect / tDone * 100) + '%' : '—';
 }
 
 function renderVerdictBars(model) {
