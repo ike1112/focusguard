@@ -31,10 +31,8 @@ function loadEnv() {
 loadEnv();
 
 const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY || '';
-const TYPESAFE_KEY   = process.env.TYPESAFE_API_KEY   || '';
 
-console.log('[bench] Claude via OpenRouter:', OPENROUTER_KEY ? '✓' : '⚠ no key');
-console.log('[bench] Typesafe             :', TYPESAFE_KEY   ? '✓' : '⚠ no key');
+console.log('[bench] OpenRouter key:', OPENROUTER_KEY ? '✓ (Claude + Jev)' : '⚠ no key');
 console.log(`[bench] Open http://localhost:${PORT}\n`);
 
 // ─── Proxy helpers ────────────────────────────────────────────────────────────
@@ -48,7 +46,7 @@ async function proxyJson(targetUrl, init) {
 async function handleStatus() {
   return {
     claude:   OPENROUTER_KEY ? 'openrouter' : null,
-    typesafe: !!TYPESAFE_KEY,
+    typesafe: !!OPENROUTER_KEY,   // Jev runs via OpenRouter too
   };
 }
 
@@ -91,15 +89,66 @@ async function handleClaude(reqBody) {
 }
 
 async function handleTypesafe(reqBody) {
-  if (!TYPESAFE_KEY) return { status: 503, body: { error: 'No Typesafe key configured in .env' } };
-  return proxyJson('https://api.typesafe.ai/v1/systemone', {
+  if (!OPENROUTER_KEY) return { status: 503, body: { error: 'OPENROUTER_API_KEY not set in .env' } };
+
+  // Jev via OpenRouter — translate the three questions to a structured prompt
+  // since OpenRouter uses the OpenAI chat format, not Typesafe's native API.
+  const { state, questions } = reqBody;
+  const questionLines = Object.entries(questions).map(([key, q]) => {
+    if (q.type === 'choice') {
+      const opts = Object.entries(q.criteria).map(([k, v]) => `  - ${k}: ${v}`).join('\n');
+      return `${key} (pick one):\n${opts}`;
+    }
+    if (q.type === 'score') {
+      const levels = q.criteria.map((c, i) => `  ${i}: ${c}`).join('\n');
+      return `${key} (score 0-${q.criteria.length - 1}):\n${levels}`;
+    }
+    return `${key} (yes=1/no=0): ${q.instructions}`;
+  }).join('\n\n');
+
+  const prompt = `Analyze this web page and answer each question with a JSON object.\n\n${state}\n\nQuestions:\n${questionLines}\n\nRespond ONLY with minified JSON where each key matches the question name. For choice questions use the exact option key. For score questions use the integer. For noul questions use 0 or 1.\nExample: {"verdict":"allow","subject_area":"math","distraction_risk":1}`;
+
+  const { status, body } = await proxyJson('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type':  'application/json',
-      'Authorization': `Bearer ${TYPESAFE_KEY}`,
+      'Authorization': `Bearer ${OPENROUTER_KEY}`,
+      'HTTP-Referer':  'http://localhost:' + PORT,
     },
-    body: JSON.stringify(reqBody),
+    body: JSON.stringify({
+      model:      'typesafe/jev-router',
+      max_tokens: 200,
+      messages:   [{ role: 'user', content: prompt }],
+    }),
   });
+
+  if (status !== 200 || !body.choices) return { status, body };
+
+  // Parse Jev's JSON response and normalise to Typesafe native shape
+  const text = body.choices[0]?.message?.content || '';
+  let parsed = {};
+  try {
+    const clean = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    parsed = JSON.parse(clean);
+  } catch { /* fall through with empty answers */ }
+
+  const answers = {};
+  for (const [key, q] of Object.entries(questions)) {
+    const val = parsed[key];
+    if (q.type === 'choice') {
+      answers[key] = { type: 'choice', choice: val || Object.keys(q.criteria)[0], confidence: 0.8, probabilities: {} };
+    } else if (q.type === 'score') {
+      answers[key] = { type: 'score', score: Number(val) || 0, legend: Object.fromEntries(q.criteria.map((c,i) => [i, c])), probabilities: {} };
+    } else {
+      answers[key] = { type: 'noul', noul: Number(val) || 0 };
+    }
+  }
+
+  const usage = body.usage || {};
+  return {
+    status: 200,
+    body: { answers, usage: { input_tokens: usage.prompt_tokens || 0, output_tokens: usage.completion_tokens || 0 } },
+  };
 }
 
 // ─── HTTP server ──────────────────────────────────────────────────────────────
