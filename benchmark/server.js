@@ -30,16 +30,11 @@ function loadEnv() {
 }
 loadEnv();
 
-const ANTHROPIC_KEY  = process.env.ANTHROPIC_API_KEY  || '';
 const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY || '';
 const TYPESAFE_KEY   = process.env.TYPESAFE_API_KEY   || '';
 
-const CLAUDE_VIA = ANTHROPIC_KEY  ? 'anthropic'
-                 : OPENROUTER_KEY ? 'openrouter'
-                 : '';
-
-console.log('[bench] Claude via :', CLAUDE_VIA  || '⚠ no key');
-console.log('[bench] Typesafe   :', TYPESAFE_KEY ? '✓' : '⚠ no key');
+console.log('[bench] Claude via OpenRouter:', OPENROUTER_KEY ? '✓' : '⚠ no key');
+console.log('[bench] Typesafe             :', TYPESAFE_KEY   ? '✓' : '⚠ no key');
 console.log(`[bench] Open http://localhost:${PORT}\n`);
 
 // ─── Proxy helpers ────────────────────────────────────────────────────────────
@@ -52,30 +47,18 @@ async function proxyJson(targetUrl, init) {
 // ─── Route handlers ───────────────────────────────────────────────────────────
 async function handleStatus() {
   return {
-    claude:   CLAUDE_VIA || null,
+    claude:   OPENROUTER_KEY ? 'openrouter' : null,
     typesafe: !!TYPESAFE_KEY,
   };
 }
 
 async function handleClaude(reqBody) {
-  if (!CLAUDE_VIA) return { status: 503, body: { error: 'No Claude key configured in .env' } };
+  if (!OPENROUTER_KEY) return { status: 503, body: { error: 'OPENROUTER_API_KEY not set in .env' } };
 
-  if (CLAUDE_VIA === 'anthropic') {
-    return proxyJson('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type':    'application/json',
-        'x-api-key':       ANTHROPIC_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify(reqBody),
-    });
-  }
-
-  // OpenRouter — translate to OpenAI chat format
-  const sys = reqBody.system || '';
+  const sys     = reqBody.system || '';
   const userMsg = reqBody.messages?.[0]?.content || '';
-  return proxyJson('https://openrouter.ai/api/v1/chat/completions', {
+
+  const { status, body } = await proxyJson('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type':  'application/json',
@@ -90,21 +73,21 @@ async function handleClaude(reqBody) {
         { role: 'user',   content: userMsg },
       ],
     }),
-  }).then(({ status, body }) => {
-    // Normalise OpenRouter response to Anthropic shape so the client doesn't care
-    if (status === 200 && body.choices) {
-      const text  = body.choices[0]?.message?.content || '';
-      const usage = body.usage || {};
-      return {
-        status: 200,
-        body: {
-          content: [{ text }],
-          usage: { input_tokens: usage.prompt_tokens || 0, output_tokens: usage.completion_tokens || 0 },
-        },
-      };
-    }
-    return { status, body };
   });
+
+  // Normalise OpenRouter response to Anthropic shape so the client doesn't care
+  if (status === 200 && body.choices) {
+    const text  = body.choices[0]?.message?.content || '';
+    const usage = body.usage || {};
+    return {
+      status: 200,
+      body: {
+        content: [{ text }],
+        usage: { input_tokens: usage.prompt_tokens || 0, output_tokens: usage.completion_tokens || 0 },
+      },
+    };
+  }
+  return { status, body };
 }
 
 async function handleTypesafe(reqBody) {
