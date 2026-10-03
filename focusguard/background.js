@@ -50,6 +50,12 @@ function logClassification({ url, title, tabId, verdict }) {
   }).catch(() => {});
 }
 
+// --- Toolbar icon click → open dashboard ---
+
+chrome.action.onClicked.addListener(() => {
+  chrome.tabs.create({ url: chrome.runtime.getURL('dashboard.html') });
+});
+
 // --- Installation handler ---
 
 chrome.runtime.onInstalled.addListener((details) => {
