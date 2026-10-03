@@ -2,11 +2,11 @@
  * setup.js — FocusGuard first-time setup.
  *
  * Collects API key + parent password, validates them, writes them to
- * chrome.storage.local. No server. Single network call to Anthropic to
+ * chrome.storage.local. No server. Single network call to OpenRouter to
  * confirm the key is valid.
  *
  * Storage contract:
- *   apiKey:         string, starts with 'sk-ant-'
+ *   apiKey:         string, starts with 'sk-or-'  (OpenRouter key)
  *   parentPassword: { salt: <hex32>, hash: <pbkdf2(salt, password, 200k)>, algo: 'pbkdf2' }
  *
  * Dev reset (service worker DevTools console):
@@ -64,18 +64,16 @@
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), API_TEST_TIMEOUT_MS);
     try {
-      const r = await fetch('https://api.anthropic.com/v1/messages', {
+      const r = await fetch('https://openrouter.ai/api/v1/systemone', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
+          'Authorization': `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: 'claude-haiku-4-5',
-          max_tokens: 1,
-          messages: [{ role: 'user', content: 'ping' }],
+          model: 'jev-latest',
+          state: 'ping',
+          questions: { ok: { type: 'noul', instructions: null } },
         }),
         signal: controller.signal,
       });
@@ -121,8 +119,8 @@
       const pw = $('password').value;
       const pw2 = $('password-confirm').value;
 
-      if (!apiKey.startsWith('sk-ant-')) {
-        setError('API key must start with sk-ant-.');
+      if (!apiKey.startsWith('sk-or-')) {
+        setError('API key must be an OpenRouter key starting with sk-or-.');
         return;
       }
       if (pw.length < MIN_PASSWORD_LEN) {
