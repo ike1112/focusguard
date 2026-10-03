@@ -2,11 +2,15 @@
   "name": "focusguard-benchmark",
   "type": "module",
   "private": true,
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "scrape": "node scrape.js",
     "serve": "node server.js"
   },
   "dependencies": {
+    "@typesafe-ai/sdk": "^0.6.0",
     "puppeteer": "^25.12.0"
   }
 }

@@ -1,6 +1,6 @@
 // benchmark/scrape.js
 // Visits each benchmark URL with a real browser, extracts title + visible text
-// exactly as the FocusGuard extension does, saves to dataset.json.
+// for the benchmark, saves to dataset.json. Capture quality needs review.
 //
 // Run: node benchmark/scrape.js   (from repo root)
 //   OR: npm run scrape             (from benchmark/)
@@ -9,6 +9,7 @@
 // reproducible without re-scraping.
 
 import puppeteer from 'puppeteer';
+import { URLS, FIXTURE_VERSION, canReuseCapture } from './urls.js';
 import { writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,54 +17,43 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OUT = resolve(__dirname, 'dataset.json');
 
-// Ground-truth labels (human-verified allow/block).
-// Add or remove URLs here, then re-run scrape.js.
-const URLS = [
-  // Clear allows — educational
-  { id:1,  url:'https://en.wikipedia.org/wiki/Photosynthesis',            gt:'allow' },
-  { id:2,  url:'https://www.khanacademy.org/science/ap-biology',          gt:'allow' },
-  { id:3,  url:'https://stackoverflow.com/questions/11227809',            gt:'allow' },
-  { id:4,  url:'https://www.wolframalpha.com/input?i=integrate+x%5E2',   gt:'allow' },
-  { id:5,  url:'https://www.desmos.com/calculator',                       gt:'allow' },
-  { id:6,  url:'https://quizlet.com/set/123456789',                       gt:'allow' },
-  { id:7,  url:'https://www.merriam-webster.com/dictionary/ephemeral',    gt:'allow' },
-  { id:8,  url:'https://www.gutenberg.org/files/1342/1342-h/1342-h.htm',  gt:'allow' },
-  { id:9,  url:'https://www.gutenberg.org/ebooks/84',                     gt:'allow' },
-  { id:10, url:'https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Functions', gt:'allow' },
-
-  // Ambiguous — verdict depends on what the page actually shows
-  { id:11, url:'https://www.youtube.com/watch?v=NybHckSEQBI',            gt:'allow' }, // history video
-  { id:12, url:'https://www.reddit.com/r/learnprogramming/',              gt:'allow' },
-  { id:13, url:'https://www.youtube.com/watch?v=dQw4w9WgXcQ',            gt:'block' }, // rickroll
-  { id:14, url:'https://www.reddit.com/r/gaming/',                        gt:'block' },
-  { id:15, url:'https://www.youtube.com/',                                gt:'allow' }, // homepage edge case
-
-  // Clear blocks — off-task
-  { id:16, url:'https://www.roblox.com/',                                 gt:'block' },
-  { id:17, url:'https://www.tiktok.com/',                                 gt:'block' },
-  { id:18, url:'https://www.twitch.tv/',                                  gt:'block' },
-  { id:19, url:'https://store.steampowered.com/',                         gt:'block' },
-  { id:20, url:'https://www.instagram.com/',                              gt:'block' },
-
-  // Edge cases
-  { id:21, url:'https://news.ycombinator.com/',                           gt:'allow' },
-  { id:22, url:'https://www.google.com/search?q=photosynthesis',          gt:'allow' },
-  { id:23, url:'https://www.amazon.com/s?k=gaming+headset',              gt:'block' },
-  { id:24, url:'https://claude.ai/',                                      gt:'allow' },
-  { id:25, url:'https://www.merriam-webster.com/',                        gt:'allow' },
-];
+// URL selection and policy rationales live in urls.js.
+// Research provenance and capture limitations are documented in urls.md.
 
 const TIMEOUT_MS = 20_000;
 const DELAY_MS   = 800;   // polite pause between requests
 
-async function extractText(page) {
+async function extractPageData(page) {
   return page.evaluate(() => {
-    // Mirror what background.js sends to the classifier:
-    // innerText of body, whitespace collapsed, first 2000 chars.
-    return (document.body?.innerText || '')
+    const clean = (value, limit) => String(value || '')
       .replace(/\s+/g, ' ')
       .trim()
-      .slice(0, 2000);
+      .slice(0, limit);
+
+    const meta = [...document.querySelectorAll('meta[name], meta[property]')]
+      .map((node) => ({
+        name: node.getAttribute('name') || node.getAttribute('property') || '',
+        content: clean(node.getAttribute('content'), 300),
+      }))
+      .filter((item) => /description|title|keywords|og:|twitter:/i.test(item.name) && item.content)
+      .slice(0, 12);
+
+    const headings = [...document.querySelectorAll('h1,h2,h3')]
+      .map((node) => clean(node.innerText || node.textContent, 160))
+      .filter(Boolean)
+      .slice(0, 20);
+
+    const links = [...document.querySelectorAll('a')]
+      .map((node) => clean(node.innerText || node.textContent || node.getAttribute('aria-label'), 120))
+      .filter(Boolean)
+      .slice(0, 40);
+
+    return {
+      excerpt: clean(document.body?.innerText, 2000),
+      meta,
+      headings,
+      links,
+    };
   });
 }
 
@@ -105,8 +95,8 @@ async function main() {
   let scraped = 0, cached = 0, failed = 0;
 
   for (const item of URLS) {
-    if (existing[item.id]) {
-      results.push(existing[item.id]);
+    if (canReuseCapture(existing[item.id], item)) {
+      results.push({ ...existing[item.id], ...item });
       process.stdout.write(`  [cached] ${item.id.toString().padStart(2)} ${item.url.slice(0, 60)}\n`);
       cached++;
       continue;
@@ -125,16 +115,18 @@ async function main() {
       // Block images/fonts/media — faster load, same text content
       await page.setRequestInterception(true);
       page.on('request', req => {
-        if (['image','font','media','stylesheet'].includes(req.resourceType())) req.abort();
+        if (['image','font','media'].includes(req.resourceType())) req.abort();
         else req.continue();
       });
 
       await page.goto(item.url, { waitUntil: 'domcontentloaded', timeout: TIMEOUT_MS });
+      await page.waitForFunction(() => document.readyState === 'complete', { timeout: 5000 }).catch(() => {});
+      await new Promise(r => setTimeout(r, 1500));
 
       const title   = await page.title();
-      const excerpt = await extractText(page);
+      const pageData = await extractPageData(page);
 
-      results.push({ ...item, title, excerpt, scraped: true, scrapedAt: new Date().toISOString() });
+      results.push({ ...item, title, ...pageData, scraped: true, fixtureVersion: FIXTURE_VERSION, scrapedAt: new Date().toISOString() });
       process.stdout.write(`  [ok]     ${item.id.toString().padStart(2)} ${title.slice(0, 55)}\n`);
       scraped++;
     } catch (e) {

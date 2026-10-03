@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// benchmark/server.js — zero npm deps, Node 18+
+// benchmark/server.js — Node 20+
 // Usage: node benchmark/server.js
 //        (run from repo root or from benchmark/ directory)
 
@@ -7,9 +7,15 @@ import { createServer } from 'node:http';
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { APIError, TypeSafeClient } from '@typesafe-ai/sdk';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = 3474;
+const ALLOWED_ORIGINS = new Set([
+  `http://localhost:${PORT}`,
+  `http://127.0.0.1:${PORT}`,
+  `http://[::1]:${PORT}`,
+]);
 
 // ─── Load .env ────────────────────────────────────────────────────────────────
 function loadEnv() {
@@ -31,6 +37,13 @@ function loadEnv() {
 loadEnv();
 
 const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY || '';
+const typesafe = OPENROUTER_KEY
+  ? new TypeSafeClient({
+      apiKey: OPENROUTER_KEY,
+      baseURL: 'https://openrouter.ai/api',
+      defaultHeaders: { 'HTTP-Referer': 'http://localhost:' + PORT },
+    })
+  : null;
 
 console.log('[bench] OpenRouter key:', OPENROUTER_KEY ? '✓ (Claude + Jev)' : '⚠ no key');
 console.log(`[bench] Open http://localhost:${PORT}\n`);
@@ -93,81 +106,36 @@ async function handleClaude(reqBody) {
 }
 
 async function handleTypesafe(reqBody) {
-  if (!OPENROUTER_KEY) return { status: 503, body: { error: 'OPENROUTER_API_KEY not set in .env' } };
+  if (!typesafe) return { status: 503, body: { error: 'OPENROUTER_API_KEY not set in .env' } };
 
-  // Jev via OpenRouter — translate the three questions to a structured prompt
-  // since OpenRouter uses the OpenAI chat format, not Typesafe's native API.
-  const { state, questions } = reqBody;
-  const questionLines = Object.entries(questions).map(([key, q]) => {
-    if (q.type === 'choice') {
-      const opts = Object.entries(q.criteria).map(([k, v]) => `  - ${k}: ${v}`).join('\n');
-      return `${key} (pick one):\n${opts}`;
-    }
-    if (q.type === 'score') {
-      const levels = q.criteria.map((c, i) => `  ${i}: ${c}`).join('\n');
-      return `${key} (score 0-${q.criteria.length - 1}):\n${levels}`;
-    }
-    return `${key} (yes=1/no=0): ${q.instructions}`;
-  }).join('\n\n');
-
-  const prompt = `Analyze this web page and answer each question with a JSON object.\n\n${state}\n\nQuestions:\n${questionLines}\n\nRespond ONLY with minified JSON where each key matches the question name. For choice questions use the exact option key. For score questions use the integer. For noul questions use 0 or 1.\nExample: {"verdict":"allow","subject_area":"math","distraction_risk":1}`;
-
-  const { status, body } = await proxyJson('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type':  'application/json',
-      'Authorization': `Bearer ${OPENROUTER_KEY}`,
-      'HTTP-Referer':  'http://localhost:' + PORT,
-    },
-    body: JSON.stringify({
-      model:      'typesafe/jev-router',
-      max_tokens: 200,
-      messages:   [{ role: 'user', content: prompt }],
-    }),
-  });
-
-  if (status !== 200 || !body.choices) return { status, body };
-
-  // Parse Jev's JSON response and normalise to Typesafe native shape
-  const text = body.choices[0]?.message?.content || '';
-  let parsed = {};
   try {
-    const clean = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    parsed = JSON.parse(clean);
-  } catch { /* fall through with empty answers */ }
-
-  const answers = {};
-  for (const [key, q] of Object.entries(questions)) {
-    const val = parsed[key];
-    if (q.type === 'choice') {
-      answers[key] = { type: 'choice', choice: val || Object.keys(q.criteria)[0], confidence: 0.8, probabilities: {} };
-    } else if (q.type === 'score') {
-      answers[key] = { type: 'score', score: Number(val) || 0, legend: Object.fromEntries(q.criteria.map((c,i) => [i, c])), probabilities: {} };
-    } else {
-      answers[key] = { type: 'noul', noul: Number(val) || 0 };
+    const body = await typesafe.systemOne({
+      state: reqBody.state,
+      questions: reqBody.questions,
+      ...(reqBody.model ? { model: reqBody.model } : {}),
+    });
+    return { status: 200, body };
+  } catch (error) {
+    if (error instanceof APIError) {
+      return { status: error.status, body: error.body ?? { error: error.message } };
     }
+    const message = error instanceof Error ? error.message : 'TypeSafe request failed';
+    return { status: 502, body: { error: message } };
   }
-
-  const usage = body.usage || {};
-  return {
-    status: 200,
-    body: {
-      answers,
-      usage: {
-        input_tokens:  usage.prompt_tokens     || 0,
-        output_tokens: usage.completion_tokens || 0,
-        cost:          usage.cost              || 0,
-      },
-    },
-  };
 }
 
 // ─── HTTP server ──────────────────────────────────────────────────────────────
 createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
+  const origin = req.headers.origin;
 
-  // CORS for local dev
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  // Do not let unrelated websites use this local server as an API-key proxy.
+  if (origin && !ALLOWED_ORIGINS.has(origin)) {
+    res.writeHead(403, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'origin not allowed' }));
+    return;
+  }
+  if (origin) res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 

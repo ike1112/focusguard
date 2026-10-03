@@ -205,31 +205,69 @@
     /* Score legend */
     .score-label { font-size: 11px; color: var(--text-muted); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    /* Performance card */
-    .perf-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-      gap: 12px;
+    /* Overview comparison matrix */
+    .metric-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
       margin-bottom: 24px;
+      table-layout: fixed;
     }
-    .perf-card {
+    .metric-table th,
+    .metric-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
       background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 14px 16px;
+      font-size: 13px;
+      text-align: right;
     }
-    .perf-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
-    .perf-value { font-size: 22px; font-weight: 700; }
-    .perf-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .metric-table th {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+    }
+    .metric-table .metric-name,
+    .metric-table .metric-note {
+      text-align: left;
+    }
+    .metric-table .metric-name {
+      font-weight: 600;
+      color: var(--text);
+    }
+    .metric-table .metric-note {
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+    .metric-table .metric-value {
+      font-weight: 700;
+      font-size: 18px;
+    }
+    .metric-table .metric-delta {
+      font-weight: 600;
+    }
+    .metric-table .winner {
+      color: var(--green);
+    }
+    .metric-table .tie {
+      color: var(--text-muted);
+    }
 
     .claude-accent { color: #d97706; }
     .typesafe-accent { color: var(--purple); }
 
     /* Comparison table */
-    .compare-table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+    .compare-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      margin-bottom: 24px;
+      table-layout: fixed;
+    }
     .compare-table th {
       text-align: left;
-      padding: 8px 12px;
+      padding: 8px 10px;
       font-size: 11px;
       font-weight: 600;
       text-transform: uppercase;
@@ -239,14 +277,36 @@
       background: var(--surface);
     }
     .compare-table td {
-      padding: 8px 12px;
+      padding: 8px 10px;
       font-size: 12px;
       border-bottom: 1px solid var(--border);
       background: var(--surface);
       vertical-align: top;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .compare-table tr:last-child td { border-bottom: none; }
-    .compare-table tr:hover td { background: var(--bg); }
+    .compare-table tbody tr:hover td { filter: brightness(0.98); }
+
+    .group-head th {
+      text-align: center;
+      border-right: 1px solid var(--border);
+    }
+    .group-base { background: #fafaf9 !important; }
+    .group-claude { background: #fff7ed !important; }
+    .group-typesafe { background: #f5f3ff !important; }
+    .group-compare { background: #f8fafc !important; text-align: center !important; }
+    .col-id { width: 38px; }
+    .col-url { width: 280px; }
+    .col-small { width: 86px; }
+    .col-risk { width: 70px; }
+    .compare-table .group-end {
+      border-right: 1px solid var(--border);
+    }
+    .row-mismatch td {
+      box-shadow: inset 3px 0 0 var(--red);
+    }
 
     .verdict-allow { color: var(--green); font-weight: 600; }
     .verdict-block { color: var(--red); font-weight: 600; }
@@ -328,6 +388,10 @@
         <span>✓</span> <span>Distraction risk</span>
         <span class="q-type">Score</span>
       </div>
+      <div class="question-item">
+        <span>✓</span> <span>Confidence</span>
+        <span class="q-type">Score</span>
+      </div>
     </div>
 
     <hr class="divider">
@@ -341,7 +405,7 @@
       </button>
       <div id="claude-progress" style="display:none">
         <div class="progress-bar-wrap"><div id="claude-bar" class="progress-bar-fill progress-claude" style="width:0%"></div></div>
-        <div id="claude-progress-text" class="progress-text">0 / 25</div>
+        <div id="claude-progress-text" class="progress-text">0 / 0</div>
       </div>
     </div>
 
@@ -356,7 +420,7 @@
       </button>
       <div id="typesafe-progress" style="display:none">
         <div class="progress-bar-wrap"><div id="typesafe-bar" class="progress-bar-fill progress-typesafe" style="width:0%"></div></div>
-        <div id="typesafe-progress-text" class="progress-text">0 / 25</div>
+        <div id="typesafe-progress-text" class="progress-text">0 / 0</div>
       </div>
     </div>
 
@@ -364,7 +428,7 @@
 
     <div class="sidebar-section">
       <div class="sidebar-label">Dataset</div>
-      <div style="font-size:12px; color:var(--text-muted);">25 URLs · ground truth labeled</div>
+      <div id="dataset-summary" style="font-size:12px; color:var(--text-muted);">Loading dataset…</div>
       <button class="btn-run btn-clear" style="margin-top:8px;" onclick="clearResults()">Clear results</button>
     </div>
   </aside>
@@ -387,39 +451,48 @@
     <!-- Overview tab -->
     <div id="tab-overview" class="tab-panel active">
 
-      <!-- Performance cards -->
-      <div class="perf-grid" id="perf-grid">
-        <div class="perf-card">
-          <div class="perf-label">Claude · Avg latency</div>
-          <div class="perf-value claude-accent" id="perf-claude-latency">—</div>
-          <div class="perf-sub">ms per call</div>
-        </div>
-        <div class="perf-card">
-          <div class="perf-label">Claude · Est. cost</div>
-          <div class="perf-value claude-accent" id="perf-claude-cost">—</div>
-          <div class="perf-sub">for 25 URLs</div>
-        </div>
-        <div class="perf-card">
-          <div class="perf-label">Claude · Accuracy</div>
-          <div class="perf-value claude-accent" id="perf-claude-acc">—</div>
-          <div class="perf-sub">vs ground truth</div>
-        </div>
-        <div class="perf-card">
-          <div class="perf-label">Typesafe · Avg latency</div>
-          <div class="perf-value typesafe-accent" id="perf-ts-latency">—</div>
-          <div class="perf-sub">ms per call</div>
-        </div>
-        <div class="perf-card">
-          <div class="perf-label">Typesafe · Est. cost</div>
-          <div class="perf-value typesafe-accent" id="perf-ts-cost">—</div>
-          <div class="perf-sub">for 25 URLs</div>
-        </div>
-        <div class="perf-card">
-          <div class="perf-label">Typesafe · Accuracy</div>
-          <div class="perf-value typesafe-accent" id="perf-ts-acc">—</div>
-          <div class="perf-sub">vs ground truth</div>
-        </div>
-      </div>
+      <!-- Performance comparison matrix -->
+      <table class="metric-table" id="overview-matrix">
+        <thead>
+          <tr>
+            <th class="metric-name">Metric</th>
+            <th class="claude-accent">Claude Haiku</th>
+            <th class="typesafe-accent">Typesafe (Jev)</th>
+            <th>Difference</th>
+            <th class="metric-note">Readout</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="metric-name">Avg latency</td>
+            <td class="metric-value claude-accent" id="perf-claude-latency">—</td>
+            <td class="metric-value typesafe-accent" id="perf-ts-latency">—</td>
+            <td class="metric-delta" id="perf-latency-delta">—</td>
+            <td class="metric-note">Lower is faster per URL</td>
+          </tr>
+          <tr>
+            <td class="metric-name">Total time</td>
+            <td class="metric-value claude-accent" id="perf-claude-total">—</td>
+            <td class="metric-value typesafe-accent" id="perf-ts-total">—</td>
+            <td class="metric-delta" id="perf-total-delta">—</td>
+            <td class="metric-note">Full benchmark run</td>
+          </tr>
+          <tr>
+            <td class="metric-name">Est. cost</td>
+            <td class="metric-value claude-accent" id="perf-claude-cost">—</td>
+            <td class="metric-value typesafe-accent" id="perf-ts-cost">—</td>
+            <td class="metric-delta" id="perf-cost-delta">—</td>
+            <td class="metric-note" id="perf-cost-note">For 0 URLs</td>
+          </tr>
+          <tr>
+            <td class="metric-name">Accuracy</td>
+            <td class="metric-value claude-accent" id="perf-claude-acc">—</td>
+            <td class="metric-value typesafe-accent" id="perf-ts-acc">—</td>
+            <td class="metric-delta" id="perf-acc-delta">—</td>
+            <td class="metric-note">Higher is better</td>
+          </tr>
+        </tbody>
+      </table>
 
       <!-- Verdict breakdown side by side -->
       <div class="results-grid">
@@ -460,15 +533,23 @@
     <div id="tab-urls" class="tab-panel">
       <table class="compare-table" id="urls-table">
         <thead>
+          <tr class="group-head">
+            <th class="group-base" colspan="3">Page</th>
+            <th class="group-claude" colspan="2">Claude</th>
+            <th class="group-typesafe" colspan="4">Typesafe (Jev)</th>
+            <th class="group-compare" colspan="1">Compare</th>
+          </tr>
           <tr>
-            <th>#</th>
-            <th>URL</th>
-            <th>Ground truth</th>
-            <th>Claude verdict</th>
-            <th>Typesafe verdict</th>
-            <th>Subject</th>
-            <th>Risk</th>
-            <th>Agree?</th>
+            <th class="group-base col-id">#</th>
+            <th class="group-base col-url">URL</th>
+            <th class="group-base col-small group-end">Truth</th>
+            <th class="group-claude col-small">Verdict</th>
+            <th class="group-claude col-small group-end">Conf.</th>
+            <th class="group-typesafe col-small">Verdict</th>
+            <th class="group-typesafe col-small">Conf.</th>
+            <th class="group-typesafe col-small">Subject</th>
+            <th class="group-typesafe col-risk group-end">Risk</th>
+            <th class="group-compare col-small">Agree</th>
           </tr>
         </thead>
         <tbody id="urls-tbody"></tbody>
@@ -521,7 +602,11 @@ let DATASET = [
 // ─── State ───────────────────────────────────────────────────────────────────
 const results = {
   claude: {},     // id → { verdict, reason, confidence, latencyMs, inputTokens, outputTokens, error }
-  typesafe: {},   // id → { verdict, subject, risk, riskLegend, latencyMs, inputTokens, outputTokens, error }
+  typesafe: {},   // id → { verdict, subject, risk, confidence, latencyMs, inputTokens, outputTokens, error }
+};
+const runTotals = {
+  claudeMs: null,
+  typesafeMs: null,
 };
 
 // Cost comes directly from OpenRouter's usage.cost field (USD) — no price
@@ -543,6 +628,35 @@ Policy:
 
 Respond ONLY with minified JSON:
 {"verdict":"allow","reason":"<short>","confidence":<0..1>}`;
+
+function cleanText(value, limit) {
+  return String(value || '').replace(/\s+/g, ' ').trim().slice(0, limit);
+}
+
+function buildPageState(item) {
+  const lines = [
+    `URL: ${cleanText(item.url, 500)}`,
+    `Title: ${cleanText(item.title || '(no title)', 200)}`,
+    `Excerpt: ${cleanText(item.excerpt || '(no excerpt available)', 2000)}`,
+  ];
+
+  if (Array.isArray(item.meta) && item.meta.length) {
+    lines.push('Meta:');
+    for (const meta of item.meta.slice(0, 12)) {
+      lines.push(`- ${cleanText(meta.name, 80)}: ${cleanText(meta.content, 300)}`);
+    }
+  }
+
+  if (Array.isArray(item.headings) && item.headings.length) {
+    lines.push(`Headings: ${item.headings.map((h) => cleanText(h, 160)).filter(Boolean).join(' | ')}`);
+  }
+
+  if (Array.isArray(item.links) && item.links.length) {
+    lines.push(`Visible links/buttons: ${item.links.map((link) => cleanText(link, 120)).filter(Boolean).slice(0, 40).join(' | ')}`);
+  }
+
+  return lines.join('\n');
+}
 
 // ─── Status check on load ─────────────────────────────────────────────────────
 async function loadStatus() {
@@ -579,6 +693,7 @@ async function runClaude() {
   clearError();
   setRunning('claude', true);
   setProgress('claude', 0, DATASET.length);
+  const runStart = Date.now();
 
   for (let i = 0; i < DATASET.length; i++) {
     const item = DATASET[i];
@@ -593,7 +708,7 @@ async function runClaude() {
           system: CLAUDE_SYSTEM,
           messages: [{
             role: 'user',
-            content: `URL: ${item.url}\nTitle: ${item.title}\nExcerpt: ${item.excerpt}`,
+            content: buildPageState(item),
           }],
         }),
       });
@@ -622,7 +737,9 @@ async function runClaude() {
     renderAll();
   }
 
+  runTotals.claudeMs = Date.now() - runStart;
   setRunning('claude', false);
+  renderAll();
 }
 
 function parseClaudeVerdict(text) {
@@ -643,22 +760,30 @@ async function runTypesafe() {
   clearError();
   setRunning('typesafe', true);
   setProgress('typesafe', 0, DATASET.length);
+  const runStart = Date.now();
 
   for (let i = 0; i < DATASET.length; i++) {
     const item = DATASET[i];
-    const state = `URL: ${item.url}\nTitle: ${item.title}\nExcerpt: ${item.excerpt}`;
+    const state = buildPageState(item);
     const t0 = Date.now();
     try {
       const res = await fetch('/api/typesafe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'jev-latest',
           state,
           questions: {
             verdict: {
               type: 'choice',
-              instructions: 'Is this web page appropriate for a student doing homework?',
+              instructions: `Decide the FocusGuard allow/block verdict for this page.
+
+Use the benchmark ground-truth policy, not generic distraction filtering:
+- Allow homework, education, reference, research, general knowledge, news, school tools, and AI assistants used for studying.
+- Block games, gaming videos, social media, entertainment videos, memes, shopping, streaming, and clearly off-task pages.
+- A bare YouTube homepage URL with no specific video/search/shorts path is allow, even if the captured page includes generic recommendations.
+- YouTube specific URLs (/watch, /results, /shorts, /gaming, /feed/trending, /@channel) classify by topic in the title/excerpt.
+- Educational search queries are allow, even if the captured search page is thin, blocked, or shows a bot/challenge page.
+- If evidence is broken, empty, or uncertain, prefer allow.`,
               criteria: {
                 allow: 'Educational, research, reference, school tools, or AI assistants used for studying.',
                 block: 'Games, social media, entertainment videos, shopping, streaming — clearly off-task.',
@@ -686,6 +811,16 @@ async function runTypesafe() {
                 'High risk — designed to capture attention.',
               ],
             },
+            classification_confidence: {
+              type: 'score',
+              instructions: 'How confident are you in the allow/block verdict for this page?',
+              criteria: [
+                'Very low confidence — the capture is empty, broken, or too ambiguous.',
+                'Low confidence — weak or conflicting evidence.',
+                'Medium confidence — enough evidence, but a policy edge or broad platform.',
+                'High confidence — clear evidence supports the verdict.',
+              ],
+            },
           },
         }),
       });
@@ -701,6 +836,7 @@ async function runTypesafe() {
           verdict:     answers.verdict?.choice        || 'allow',
           subject:     answers.subject_area?.choice   || 'general',
           risk:        answers.distraction_risk?.score ?? null,
+          confidence:  answers.classification_confidence?.score ?? null,
           riskLegend:  answers.distraction_risk?.legend || {},
           latencyMs,
           inputTokens:  data?.usage?.input_tokens  || 0,
@@ -716,7 +852,9 @@ async function runTypesafe() {
     renderAll();
   }
 
+  runTotals.typesafeMs = Date.now() - runStart;
   setRunning('typesafe', false);
+  renderAll();
 }
 
 // ─── Render ───────────────────────────────────────────────────────────────────
@@ -736,28 +874,78 @@ function renderPerf() {
   const tr = Object.values(results.typesafe);
 
   const fmtCost = total => total > 0 ? '$' + total.toFixed(4) : '—';
+  const avg = arr => arr.length ? Math.round(arr.reduce((a,b) => a+b, 0) / arr.length) : null;
   const fmtLatency = arr => arr.length
-    ? Math.round(arr.reduce((a,b) => a+b, 0) / arr.length) + 'ms' : '—';
+    ? avg(arr) + 'ms' : '—';
+  const fmtTotal = ms => {
+    if (!ms) return '—';
+    if (ms < 1000) return Math.round(ms) + 'ms';
+    const seconds = ms / 1000;
+    if (seconds < 60) return seconds.toFixed(seconds < 10 ? 1 : 0) + 's';
+    const minutes = Math.floor(seconds / 60);
+    const remainder = Math.round(seconds % 60);
+    return `${minutes}m ${remainder}s`;
+  };
+  const fmtPct = value => value === null ? '—' : Math.round(value * 100) + '%';
+  const setDelta = (id, text, winner) => {
+    const node = el(id);
+    node.textContent = text;
+    node.className = `metric-delta ${winner ? 'winner' : 'tie'}`;
+  };
+  const ratioDelta = (a, b, lowerIsBetter, unit) => {
+    if (!a || !b) return { text: '—', winner: null };
+    if (a === b) return { text: 'same', winner: null };
+    const better = lowerIsBetter ? (a < b ? 'Claude' : 'Jev') : (a > b ? 'Claude' : 'Jev');
+    const ratio = Math.max(a, b) / Math.min(a, b);
+    const diff = Math.abs(a - b);
+    const detail = unit === '$' ? `$${diff.toFixed(4)}` : unit === '%' ? `${Math.round(diff * 100)} pts` : fmtTotal(diff);
+    return { text: `${better} ${ratio.toFixed(1)}x better (${detail})`, winner: true };
+  };
 
   // Claude
   const cLatencies = cr.filter(r => !r.error).map(r => r.latencyMs).filter(Boolean);
+  const cAvgLatency = avg(cLatencies);
   const cCost    = cr.reduce((s, r) => s + (r.cost || 0), 0);
   const cCorrect = DATASET.filter(d => { const r = results.claude[d.id]; return r && !r.error && r.verdict === d.gt; }).length;
   const cDone    = cr.filter(r => !r.error).length;
+  const cAcc = cDone > 0 ? cCorrect / cDone : null;
 
   el('perf-claude-latency').textContent = fmtLatency(cLatencies);
+  el('perf-claude-total').textContent   = fmtTotal(runTotals.claudeMs);
   el('perf-claude-cost').textContent    = cDone > 0 ? fmtCost(cCost) : '—';
-  el('perf-claude-acc').textContent     = cDone > 0 ? Math.round(cCorrect / cDone * 100) + '%' : '—';
+  el('perf-claude-acc').textContent     = fmtPct(cAcc);
 
   // Typesafe
   const tLatencies = tr.filter(r => !r.error).map(r => r.latencyMs).filter(Boolean);
+  const tAvgLatency = avg(tLatencies);
   const tCost    = tr.reduce((s, r) => s + (r.cost || 0), 0);
   const tCorrect = DATASET.filter(d => { const r = results.typesafe[d.id]; return r && !r.error && r.verdict === d.gt; }).length;
   const tDone    = tr.filter(r => !r.error).length;
+  const tAcc = tDone > 0 ? tCorrect / tDone : null;
 
   el('perf-ts-latency').textContent = fmtLatency(tLatencies);
+  el('perf-ts-total').textContent   = fmtTotal(runTotals.typesafeMs);
   el('perf-ts-cost').textContent    = tDone > 0 ? fmtCost(tCost) : '—';
-  el('perf-ts-acc').textContent     = tDone > 0 ? Math.round(tCorrect / tDone * 100) + '%' : '—';
+  el('perf-ts-acc').textContent     = fmtPct(tAcc);
+  el('perf-cost-note').textContent  = `For ${Math.max(cDone, tDone) || DATASET.length} URLs`;
+
+  const latency = ratioDelta(cAvgLatency, tAvgLatency, true);
+  const total = ratioDelta(runTotals.claudeMs, runTotals.typesafeMs, true);
+  const cost = ratioDelta(cCost || null, tCost || null, true, '$');
+  const acc = ratioDelta(cAcc, tAcc, false, '%');
+  setDelta('perf-latency-delta', latency.text, latency.winner);
+  setDelta('perf-total-delta', total.text, total.winner);
+  setDelta('perf-cost-delta', cost.text, cost.winner);
+  setDelta('perf-acc-delta', acc.text, acc.winner);
+}
+
+function renderDatasetSummary(kind = 'labeled URLs') {
+  document.querySelector('.page-sub').textContent =
+    `${DATASET.length} ${kind} · Claude Haiku vs Typesafe (Jev) · real API calls`;
+  el('dataset-summary').textContent = `${DATASET.length} URLs · ground truth labeled`;
+  el('perf-cost-note').textContent = `For ${DATASET.length} URLs`;
+  el('perf-claude-total').textContent = '—';
+  el('perf-ts-total').textContent = '—';
 }
 
 function renderVerdictBars(model) {
@@ -847,27 +1035,33 @@ function renderUrlsTable() {
     const tr = results.typesafe[d.id];
     const cv = cr ? (cr.error ? `<span class="verdict-error">error</span>` : `<span class="verdict-${cr.verdict}">${cr.verdict}</span>`) : '<span class="verdict-pending">—</span>';
     const tv = tr ? (tr.error ? `<span class="verdict-error">error</span>` : `<span class="verdict-${tr.verdict}">${tr.verdict}</span>`) : '<span class="verdict-pending">—</span>';
+    const cConf = cr && !cr.error && cr.confidence !== undefined ? Math.round(cr.confidence * 100) + '%' : '—';
+    const tConf = tr && !tr.error && tr.confidence !== null && tr.confidence !== undefined ? Math.round((tr.confidence / 3) * 100) + '%' : '—';
     const subj = tr && !tr.error ? tr.subject : '—';
     const risk = tr && !tr.error && tr.risk !== null && tr.risk !== undefined ? (tr.risk + 1).toFixed(1) : '—';
 
     let agree = '—';
+    let mismatch = false;
     if (cr && tr && !cr.error && !tr.error) {
       const match = cr.verdict === tr.verdict;
+      mismatch = !match;
       agree = `<span class="agree-badge ${match ? 'agree-yes' : 'agree-no'}">${match ? '✓' : '✗'}</span>`;
     }
 
-    const short = d.url.replace(/^https?:\/\/(www\.)?/, '').slice(0, 40);
+    const short = d.url.replace(/^https?:\/\/(www\.)?/, '');
     const gtBadge = `<span class="verdict-${d.gt}">${d.gt}</span>`;
 
-    return `<tr>
-      <td>${d.id}</td>
-      <td title="${d.url}">${short}…</td>
-      <td>${gtBadge}</td>
-      <td>${cv}</td>
-      <td>${tv}</td>
-      <td>${subj}</td>
-      <td>${risk}</td>
-      <td>${agree}</td>
+    return `<tr class="${mismatch ? 'row-mismatch' : ''}">
+      <td class="group-base">${d.id}</td>
+      <td class="group-base" title="${d.url}">${short}</td>
+      <td class="group-base group-end">${gtBadge}</td>
+      <td class="group-claude">${cv}</td>
+      <td class="group-claude group-end">${cConf}</td>
+      <td class="group-typesafe">${tv}</td>
+      <td class="group-typesafe">${tConf}</td>
+      <td class="group-typesafe">${subj}</td>
+      <td class="group-typesafe group-end">${risk}</td>
+      <td class="group-compare">${agree}</td>
     </tr>`;
   }).join('');
 }
@@ -900,15 +1094,18 @@ function clearError() {
 function clearResults() {
   Object.keys(results.claude).forEach(k => delete results.claude[k]);
   Object.keys(results.typesafe).forEach(k => delete results.typesafe[k]);
+  runTotals.claudeMs = null;
+  runTotals.typesafeMs = null;
   renderAll();
   // Reset empty states
   ['claude-verdict-bars','ts-verdict-bars','ts-subject-bars','ts-risk-bars','claude-conf-bars','agreement-bars'].forEach(id => {
     el(id).innerHTML = '<div class="empty" style="padding:12px;font-size:12px;">Run a model to see results</div>';
   });
   el('urls-tbody').innerHTML = '';
-  ['perf-claude-latency','perf-claude-cost','perf-claude-acc','perf-ts-latency','perf-ts-cost','perf-ts-acc'].forEach(id => {
+  ['perf-claude-latency','perf-claude-total','perf-claude-cost','perf-claude-acc','perf-ts-latency','perf-ts-total','perf-ts-cost','perf-ts-acc','perf-latency-delta','perf-total-delta','perf-cost-delta','perf-acc-delta'].forEach(id => {
     el(id).textContent = '—';
   });
+  el('perf-cost-note').textContent = `For ${DATASET.length} URLs`;
 }
 
 function switchTab(name) {
@@ -929,14 +1126,11 @@ async function init() {
       const real = data.filter(d => d.scraped);
       if (real.length > 0) {
         DATASET = real;
-        document.querySelector('.page-sub').textContent =
-          `${DATASET.length} real scraped URLs · Claude Haiku vs Typesafe (Jev) · real API calls`;
-        document.querySelector('.sidebar-section:last-child div').textContent =
-          `${DATASET.length} URLs · real scraped content`;
       }
     }
   } catch { /* server not running — use mock dataset */ }
 
+  renderDatasetSummary(DATASET.some(d => d.scraped) ? 'real scraped URLs' : 'labeled URLs');
   renderUrlsTable();
   loadStatus();
 }
